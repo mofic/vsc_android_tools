@@ -5,7 +5,6 @@ const { StringDecoder } = require('node:string_decoder');
 const { randomBytes } = require('node:crypto');
 const path = require('node:path');
 const { compileQuery } = require('./log-query');
-const { screenshot, startRecording } = require('./capture');
 const { EventEmitter } = require('node:events');
 const { parseLog, filterLog, importLogs, normalizeLogFilter, recentFilters } = require('./core');
 let nextSession = 1;
@@ -36,8 +35,6 @@ const icons = {
   pause: '<path class="idle-icon" d="M8 5v14M16 5v14"/><path class="active-icon" d="m8 5 11 7-11 7Z"/>',
   clear: '<path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13M10 10v7m4-7v7"/>',
   search: '<circle cx="10" cy="10" r="6"/><path d="m15 15 5 5"/>',
-  screenshot: '<path d="M3 7h4l2-3h6l2 3h4v13H3Z"/><circle cx="12" cy="13" r="4"/>',
-  record: '<circle class="idle-icon" cx="12" cy="12" r="7"/><rect class="active-icon" x="6" y="6" width="12" height="12"/>',
   more: '<circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/>',
   up: '<path d="m6 14 6-6 6 6"/>', down: '<path d="m6 10 6 6 6-6"/>', close: '<path d="m6 6 12 12M6 18 18 6"/>'
 };
@@ -62,8 +59,6 @@ ${iconButton('pause', '暂停日志显示', 'pause', `${offline} aria-pressed="f
 ${iconButton('jumpEnd', '回到最新日志并跟随', 'down')}
 ${iconButton('clear', '清空当前视图', 'clear')}
 ${iconButton('findToggle', '搜索日志（Ctrl/Cmd+F）', 'search', 'aria-expanded="false" aria-controls="searchbar"')}
-${iconButton('screenshot', '设备截屏', 'screenshot', offline)}
-${iconButton('record', '开始录屏（无声，最长 180 秒）', 'record', `${offline} aria-pressed="false"`)}
 <details id="more" class="popover"><summary title="更多操作" aria-label="更多操作">${icon('more')}</summary><div class="more-menu">
 <button id="newTab">新建标签页</button><button id="split">在旁边分屏</button><hr><button id="import">导入日志…</button><button id="export">导出日志…</button><button id="copy">复制日志</button><hr><button id="restart" ${offline}>重新连接</button><button id="deviceClear" ${offline}>清除设备日志…</button></div></details>
 </header>
@@ -73,41 +68,7 @@ ${iconButton('record', '开始录屏（无声，最长 180 秒）', 'record', `$
   let queryMatcher = compileQuery();
   let lines = source?.entries.map((entry,index) => ({ ...entry, id: index + 1 })) || [], filter = { level: 'V' }, pids, child, partial = '', paused = false, disposed = false, changed = true, packageId = '', checking = false;
   let processNames = new Map();
-  let recording, screenshotBusy = false, recordingBusy = false;
   const send = message => { if (!disposed) panel.webview.postMessage(message); };
-  const captureState = () => send({ type: 'captureState', device: !!serial, recording: !!recording, screenshotBusy, recordingBusy });
-  async function captureScreenshot() {
-    if (!serial || screenshotBusy) return;
-    if (!v.workspace.isTrusted) throw new Error('请先信任工作区');
-    screenshotBusy = true; captureState();
-    try {
-      const uri = await v.window.showSaveDialog({ title: `设备截屏 · ${serial}`, defaultUri: v.Uri.file(`screenshot-${Date.now()}.png`), filters: { PNG: ['png'] } });
-      if (!uri || disposed) return;
-      if (uri.scheme !== 'file') throw new Error('请选择本地保存路径');
-      await screenshot(adb, serial, uri.fsPath);
-      v.window.showInformationMessage(`截图已保存：${uri.fsPath}`);
-      await v.commands.executeCommand('vscode.open', uri);
-    } finally { screenshotBusy = false; captureState(); }
-  }
-  async function toggleRecording() {
-    if (!serial || recordingBusy) return;
-    if (!v.workspace.isTrusted) throw new Error('请先信任工作区');
-    recordingBusy = true; captureState();
-    if (recording) {
-      try { await recording.stop(); } catch(e) { recordingBusy = false; captureState(); throw e; }
-      return;
-    }
-    try {
-      const uri = await v.window.showSaveDialog({ title: `录屏保存位置 · ${serial}`, defaultUri: v.Uri.file(`recording-${Date.now()}.mp4`), filters: { MP4: ['mp4'] } });
-      if (!uri || disposed) { recordingBusy = false; captureState(); return; }
-      if (uri.scheme !== 'file') throw new Error('请选择本地保存路径');
-      const session = startRecording(adb, serial, uri.fsPath); recording = session;
-      // Notification promises wait for dismissal; release recording state before showing them.
-      session.done.finally(() => { if (recording === session) { recording = undefined; recordingBusy = false; captureState(); } }).then(() => v.window.showInformationMessage(`录屏已保存：${uri.fsPath}`), error);
-      await session.ready.catch(() => {});
-      recordingBusy = false; captureState();
-    } catch(e) { recordingBusy = false; captureState(); throw e; }
-  }
   const sendHistory = () => send({ type: 'history', filters: ctx.globalState.get('logcat.recentFilters', []), favorites: ctx.globalState.get('logcat.favorites', []) });
   historyEvents.on('changed', sendHistory);
   function filtered() { return lines.filter(entry => filterLog(entry, filter, packageId && entry.processName ? undefined : pids) && (!packageId || !entry.processName || entry.processName === packageId || entry.processName.startsWith(packageId + ':')) && queryMatcher.test(entry)); }
@@ -145,14 +106,12 @@ ${iconButton('record', '开始录屏（无声，最长 180 秒）', 'record', `$
     try {
       switch (message.type) {
         case 'ready':
-          sendHistory(); captureState();
+          sendHistory();
           if (source) { send({ type: 'status', text: `已导入 ${source.name} · ${source.total} 行${source.total > lines.length ? `，显示最后 ${lines.length} 行` : ''} · 离线模式` }); send({ type: 'lines', lines: filtered() }); changed = false; }
           else { await updateProcesses(); if (!disposed) start(); } break;
         case 'newTab': openLogcat(ctx, adb, serial, error, source, v.ViewColumn.Active, resolveMine); break;
         case 'split': openLogcat(ctx, adb, serial, error, source, v.ViewColumn.Beside, resolveMine); break;
         case 'import': await importLogcat(ctx, adb, error); break;
-        case 'screenshot': await captureScreenshot(); break;
-        case 'record': await toggleRecording(); break;
         case 'restart': await updateProcesses(); if (!disposed) start(); break;
         case 'filter':
         case 'useFilter': {
@@ -190,7 +149,7 @@ ${iconButton('record', '开始录屏（无声，最长 180 秒）', 'record', `$
       }
     } catch(e) { if (['filter','useFilter'].includes(message.type)) send({ type: 'queryError', text: e.message }); error(e); }
   });
-  const cleanup = () => { historyEvents.off('changed', sendHistory); disposed = true; recording?.stop().catch(error); child?.kill(); child = undefined; lines = []; processNames.clear(); source = undefined; pids = undefined; clearInterval(render); clearInterval(track); };
+  const cleanup = () => { historyEvents.off('changed', sendHistory); disposed = true; child?.kill(); child = undefined; lines = []; processNames.clear(); source = undefined; pids = undefined; clearInterval(render); clearInterval(track); };
   panel.onDidDispose(cleanup); ctx.subscriptions.push(panel, { dispose: cleanup });
   return panel;
 }

@@ -2,7 +2,7 @@
 const vscode = acquireVsCodeApi();
 const byId = id => document.getElementById(id);
 const currentFilter = () => ({ query: byId('query').value, level: byId('level').value, text: byId('text').value, regex: byId('regex').checked, tag: byId('tag').value, package: byId('package').value });
-for (const id of ['screenshot','record','newTab','split','apply','pause','clear','deviceClear','copy','import','export','restart','favorite','unfavorite']) byId(id).addEventListener('click', () => {
+for (const id of ['newTab','split','apply','pause','clear','deviceClear','copy','import','export','restart','favorite','unfavorite']) byId(id).addEventListener('click', () => {
   if (id === 'apply' || id === 'favorite') vscode.postMessage({ type: id === 'apply' ? 'filter' : 'favorite', filter: currentFilter() });
   else if (id === 'unfavorite') { if (byId('favorites').value) vscode.postMessage({ type: id, name: JSON.parse(byId('favorites').value).name }); }
   else vscode.postMessage({ type: id });
@@ -163,12 +163,6 @@ window.addEventListener('message', ({ data }) => {
     byId('filterOptionsToggle').ariaPressed = String(!!(data.filter.tag || data.filter.package));
   }
   if (data.type === 'queryError') { byId('query').ariaInvalid = 'true'; byId('query').title = data.text; byId('status').textContent = data.text; }
-  if (data.type === 'captureState') {
-    byId('screenshot').disabled = !data.device || data.screenshotBusy;
-    byId('record').disabled = !data.device || data.recordingBusy;
-    byId('record').title = byId('record').ariaLabel = data.recordingBusy ? '录屏处理中…' : (data.recording ? '停止录屏并保存' : '开始录屏（无声，最长 180 秒）');
-    byId('record').ariaPressed = String(data.recording); byId('record').ariaBusy = String(data.recordingBusy);
-  }
   if (data.type === 'status') byId('status').textContent = data.text;
   if (data.type === 'paused') { byId('pause').title = byId('pause').ariaLabel = data.value ? '继续日志显示' : '暂停日志显示'; byId('pause').ariaPressed = String(data.value); byId('pauseStatus').textContent = data.value ? `已暂停 · 新增 ${data.pending || 0} 条` : ''; }
   if (data.type === 'lines') {

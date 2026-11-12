@@ -21,10 +21,5 @@ test('history dropdown restores configuration and keeps editor fields synchroniz
   element('wrap').checked=false;element('wrap').listeners.change();assert.equal(element('logs').style.whiteSpace,'pre');
   element('wrap').checked=true;element('wrap').listeners.change();assert.equal(element('logs').style.whiteSpace,'pre-wrap');
   receive({data:{type:'paused',value:true,pending:6}});assert.match(element('pauseStatus').textContent,/新增 6/);
-  element('screenshot').listeners.click();assert.equal(sent.at(-1).type,'screenshot');
-  receive({data:{type:'captureState',device:true,recording:true,screenshotBusy:false,recordingBusy:false}});
-  assert.equal(element('record').ariaPressed,'true');assert.equal(element('record').disabled,false);
-  receive({data:{type:'captureState',device:false,recording:false,screenshotBusy:false,recordingBusy:false}});
-  assert.equal(element('record').disabled,true);assert.equal(element('screenshot').disabled,true);
   element('apply').listeners.click();assert.equal(sent.at(-1).type,'filter');assert.equal(sent.at(-1).filter.tag,'App');
 });

@@ -14,7 +14,7 @@
 - `src/run-targets.js`：通过 Gradle 应用变体模型识别运行目标，限定模块和变体的 APK。
 - `src/log-query.js`：Studio 风格查询解析和匹配，不执行用户输入代码。
 - `src/logcat.js`：Logcat Webview 生命周期、实时/离线日志、过滤历史及采集操作。
-- `src/capture.js`：截屏、录屏进程与安全保存。
+- `src/device-capture.js`：设备行截图/录屏入口、每设备会话与停止状态栏；`src/capture.js`：采集进程与安全保存。
 - `media/logcat.js`、`media/logcat.css`：Webview 交互和样式。
 - `test/*.test.js`：自动化测试；`test/host.cjs`：真实 Extension Host 验证入口。
 - `test/device-smoke.js`、`test/root-smoke.js`、`test/capture-smoke.js`：需明确指定设备的手动真机验证脚本。

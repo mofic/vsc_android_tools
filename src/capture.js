@@ -29,7 +29,7 @@ async function screenshot(adb, serial, destination) {
   } catch(e) { throw recovery(e, serial, remote); }
 }
 function startRecording(adb, serial, destination) {
-  if (recordings.has(serial)) throw new Error('该设备正在录屏，请先在原标签页停止');
+  if (recordings.has(serial)) throw new Error('该设备正在录屏，请先在设备列表停止');
   const remote = `/data/local/tmp/android-tools-${randomUUID()}.mp4`;
   const child = spawn(adb.binary(), ['-s', serial, 'shell', `echo $$; exec screenrecord --time-limit 180 ${quote(remote)}`], { windowsHide: true });
   let pid, output = '', diagnostic = '', ended = false, stopping = false, resolveReady, rejectReady, finish, stopTimer;

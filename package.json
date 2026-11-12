@@ -2,7 +2,7 @@
   "name": "android-device-tools",
   "displayName": "Android Device Tools",
   "description": "Android 设备、文件、应用与彩色 Logcat 管理",
-  "version": "0.2.7",
+  "version": "0.2.8",
   "publisher": "local-android-tools",
   "license": "MIT",
   "engines": {
@@ -23,7 +23,7 @@
   },
   "scripts": {
     "test": "node --test test/*.test.js",
-    "check": "node --check src/remote-path.js && node --check src/root-files.js && node --check src/run-targets.js && node --check src/core.js && node --check src/extension.js && node --check src/logcat.js && node --check media/logcat.js && node --check src/capture.js && node --check src/log-query.js && node --check src/app-view.js && node --check media/app.js",
+    "check": "node --check src/remote-path.js && node --check src/root-files.js && node --check src/run-targets.js && node --check src/core.js && node --check src/extension.js && node --check src/logcat.js && node --check media/logcat.js && node --check src/device-capture.js && node --check src/capture.js && node --check src/log-query.js && node --check src/app-view.js && node --check media/app.js",
     "package": "npx @vscode/vsce package --no-dependencies"
   },
   "contributes": {
@@ -233,6 +233,24 @@
         "title": "打开开发者选项",
         "category": "Android Tools",
         "icon": "$(settings-gear)"
+      },
+      {
+        "command": "androidTools.screenshot",
+        "title": "设备截屏",
+        "category": "Android Tools",
+        "icon": "$(device-camera)"
+      },
+      {
+        "command": "androidTools.record",
+        "title": "开始录屏（无声，最长180秒）",
+        "category": "Android Tools",
+        "icon": "$(record)"
+      },
+      {
+        "command": "androidTools.stopRecording",
+        "title": "停止录屏并保存",
+        "category": "Android Tools",
+        "icon": "$(debug-stop)"
       }
     ],
     "viewsContainers": {
@@ -398,6 +416,21 @@
         {
           "command": "androidTools.refreshDirectory",
           "when": "view == androidFiles && viewItem != androidParent"
+        },
+        {
+          "command": "androidTools.screenshot",
+          "when": "view == androidDevices && (viewItem == androidDevice || viewItem == androidDeviceRecording || viewItem == androidDeviceBusy)",
+          "group": "inline@1"
+        },
+        {
+          "command": "androidTools.record",
+          "when": "view == androidDevices && viewItem == androidDevice",
+          "group": "inline@2"
+        },
+        {
+          "command": "androidTools.stopRecording",
+          "when": "view == androidDevices && viewItem == androidDeviceRecording",
+          "group": "inline@2"
         }
       ]
     },

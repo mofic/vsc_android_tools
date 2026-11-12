@@ -41,6 +41,7 @@ test('activates every contributed command and tree, then disposes timers', async
     const devices=await trees.get('androidDevices').getChildren(); assert.equal(devices[0].serial,'serial');
     await commands.get('androidTools.selectDevice')(devices[0]);
     assert.equal(trees.get('androidDevices').getTreeItem(devices[0]).description,'serial · 当前');
+    assert.equal(trees.get('androidDevices').getTreeItem(devices[0]).contextValue,'androidDevice');
     await commands.get('androidTools.openAppDirectory')();
     assert.equal(state.get(`package:${project}`), 'com.example.debug');
     assert.ok(calls.includes('androidFiles.focus'));

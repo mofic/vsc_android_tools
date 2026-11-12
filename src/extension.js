@@ -4,6 +4,7 @@ const fs = require('node:fs/promises');
 const os = require('node:os');
 const path = require('node:path');
 const c = require('./core');
+const { deviceCapture } = require('./device-capture');
 const runTargets = require('./run-targets');
 const { registerAppView } = require('./app-view');
 const { openLogcat, importLogcat } = require('./logcat');
@@ -19,6 +20,7 @@ function activate(ctx) {
   status.command = 'androidTools.selectDevice'; status.text = '$(device-mobile) Android: 选择设备'; status.show();
   const error = e => v.window.showErrorMessage(`Android Tools: ${e.message || e}`);
   const trust = () => { if (!v.workspace.isTrusted) throw new Error('请先信任工作区再执行写入或构建操作'); };
+  const captures = deviceCapture(ctx, adb, () => deviceEvent.fire(), error);
   const directoryCache = new Map();
   function updateFileHeader() {
     updateAppView();
@@ -112,6 +114,7 @@ function activate(ctx) {
   async function target(item) { if (item?.parent) throw new Error('返回上一级不是设备文件，不能执行文件操作'); const serial = item?.serial || await device(); const t = node(item); c.remotePath(t.remote); return { ...t, serial }; }
   const devicesProvider = { onDidChangeTreeData: deviceEvent.event, getChildren: () => deviceList, getTreeItem: d => {
     const item = new v.TreeItem(`${d.model || d.serial} (${d.state})`); item.description = `${d.serial}${selected === d.serial ? ' · 当前' : ''}`;
+    item.contextValue = d.state === 'device' ? 'androidDevice' + captures.state(d.serial) : 'androidDeviceUnavailable';
     item.iconPath = new v.ThemeIcon('device-mobile'); item.command = { command: 'androidTools.selectDevice', title: '选择设备', arguments: [d] }; return item;
   }};
   const filesProvider = { getParent: item => item.parentNode, onDidChangeTreeData: fileEvent.event, getChildren: async item => {
@@ -142,6 +145,9 @@ function activate(ctx) {
     if (!f.directory && !f.unknown) item.command = { command: 'androidTools.open', title: '编辑', arguments: [f] }; return item;
   }};
   const handlers = {
+    screenshot: async item => { await captures.screenshot(item?.serial || await device()); },
+    record: async item => { await captures.record(item?.serial || await device()); },
+    stopRecording: async item => { await captures.stop(item?.serial || await device()); },
     refresh, selectDevice: chooseDevice, selectProject: chooseProject,
     selectPackage: async () => pkg(true),
     installProject: async () => {

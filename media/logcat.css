@@ -17,7 +17,6 @@ input,select{color:var(--vscode-input-foreground);background:var(--vscode-input-
 .active-icon{display:none}
 [aria-pressed=true] .idle-icon{display:none}
 [aria-pressed=true] .active-icon{display:block}
-#record[aria-pressed=true]{color:var(--vscode-errorForeground)}
 [aria-busy=true] svg{opacity:.5}
 .separator{height:16px;width:1px;background:var(--vscode-panel-border);margin:0 3px}
 .scroll-toggle{display:flex;align-items:center;gap:3px;font-size:12px;white-space:nowrap;padding:0 4px}
