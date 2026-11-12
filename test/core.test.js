@@ -63,3 +63,15 @@ test('import normalizes BOM CRLF ANSI and reports bounded retention', () => {
   assert.equal(entry.level, 'E'); assert.equal(entry.tag, 'App');
   assert.equal(c.importLogs('').total, 0);
 });
+test('recent filters validate, deduplicate, move reused entries first and retain latest 20', () => {
+  const first={level:'E',text:'failure',regex:false,tag:'App',package:'com.example.app'};
+  let history=c.recentFilters([],first);
+  history=c.recentFilters(history,{...first,text:'debug'});
+  history=c.recentFilters(history,first);
+  assert.equal(history.length,2);assert.equal(history[0].text,'failure');
+  for(let i=0;i<25;i++)history=c.recentFilters(history,{...first,text:String(i)});
+  assert.equal(history.length,20);assert.equal(history[0].text,'24');
+  assert.throws(()=>c.recentFilters(history,{...first,regex:true,text:'['}));
+  assert.throws(()=>c.normalizeLogFilter({...first,package:'com.foo;id'}));
+  assert.deepEqual(c.recentFilters([null,{bad:true}],first),[first]);
+});

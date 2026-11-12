@@ -15,7 +15,8 @@ test('Logcat tabs split and keep independent filters, buffers, pause and process
   Module._load=function(id,...args){if(id==='vscode')return mock;if(id==='node:child_process')return {spawn:fakeSpawn};return original.call(this,id,...args)};
   try {
     const {openLogcat}=require('../src/logcat');
-    const ctx={subscriptions,extensionUri:'test'}, adb={binary:()=> 'adb'}, fail=e=>{throw e;};
+    const state = new Map(), globalState={get:(key,fallback)=>state.get(key) || fallback,update:async(key,value)=>state.set(key,value)};
+    const ctx={subscriptions,extensionUri:'test',globalState}, adb={binary:()=> 'adb'}, fail=e=>{throw e;};
     const first=openLogcat(ctx,adb,'serial',fail);
     assert.match(first.webview.html,/id="newTab"/);
     await first.send({type:'ready'});await first.send({type:'newTab'});
@@ -24,6 +25,9 @@ test('Logcat tabs split and keep independent filters, buffers, pause and process
     const data=Buffer.from('11-12 12:13:14.123  123  456 E App: failure\n11-12 12:13:14.124  123  456 D Other: debug\n');
     processes[0].stdout.emit('data',data);processes[1].stdout.emit('data',data);
     await first.send({type:'filter',filter:{level:'E',text:'',tag:'',package:''}});
+    assert.equal(state.get('logcat.recentFilters')[0].level,'E');
+    assert.ok(second.messages.some(m=>m.type==='history' && m.filters[0]?.level==='E'));
+    assert.ok(!second.messages.some(m=>m.type==='filterApplied'));
     await first.send({type:'copy'});assert.match(clipboard,/failure/);assert.ok(!clipboard.includes('debug'));
     await second.send({type:'copy'});assert.match(clipboard,/debug/);
     await first.send({type:'pause'});assert.equal(first.messages.at(-1).type,'paused');assert.ok(!second.messages.some(m=>m.type==='paused'));
@@ -31,5 +35,14 @@ test('Logcat tabs split and keep independent filters, buffers, pause and process
     first.dispose();assert.ok(processes[0].killed);assert.equal(processes[1].killed,false);
     await second.send({type:'split'});assert.equal(panels[2].column,mock.ViewColumn.Beside);
     await panels[2].send({type:'ready'});assert.equal(processes.length,3);
+    assert.equal(panels[2].messages.find(m=>m.type==='history').filters[0].level,'E');
+    await Promise.all([
+      second.send({type:'filter',filter:{level:'D',text:'debug',tag:'',package:''}}),
+      panels[2].send({type:'filter',filter:{level:'E',text:'failure',tag:'',package:''}})
+    ]);
+    assert.equal(state.get('logcat.recentFilters').length,3);
+    await second.send({type:'useFilter',filter:state.get('logcat.recentFilters')[0]});
+    await second.send({type:'copy'});assert.match(clipboard,/failure/);assert.ok(!clipboard.includes('debug'));
+    assert.equal(state.get('logcat.recentFilters').length,3);
   } finally {for(const item of subscriptions)item.dispose();Module._load=original;}
 });

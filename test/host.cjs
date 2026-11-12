@@ -20,7 +20,7 @@ exports.run = async () => {
   }
   const { openLogcat } = require('../src/logcat');
   const subscriptions = [], source = { name: 'tabs-test.log', total: 1, entries: [{ line: 'offline', level: 'I', tag: '', pid: '' }] };
-  const context = { extensionUri: extension.extensionUri, subscriptions };
+  const context = { extensionUri: extension.extensionUri, subscriptions, globalState: { get: (_, fallback) => fallback } };
   try {
     const first = openLogcat(context, {}, undefined, e => { throw e; }, source);
     const second = openLogcat(context, {}, undefined, e => { throw e; }, source, v.ViewColumn.Beside);

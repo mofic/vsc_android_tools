@@ -5,7 +5,7 @@ VS Code 安卓设备管理插件，支持原生 Android Gradle 项目和多根�
 ## 安装与运行
 
 1. 安装 Android SDK Platform Tools，在终端确认 `adb devices -l` 能看到已授权设备。
-2. 在 VS Code 执行 **Extensions: Install from VSIX…**，选择本仓库生成的 `android-device-tools-0.1.6.vsix`。
+2. 在 VS Code 执行 **Extensions: Install from VSIX…**，选择本仓库生成的 `android-device-tools-0.1.7.vsix`。
 3. 打开左侧 Android Tools 图标，点击设备选中目标。ADB 不在 PATH 时设置 `androidTools.adbPath`。
 4. 使用命令面板搜索 `Android Tools` 执行应用和文件操作；文件树提供右键菜单。
 
@@ -42,6 +42,10 @@ VS Code 安卓设备管理插件，支持原生 Android Gradle 项目和多根�
 ## 验证范围
 
 `node:test` 覆盖路径与 shell 引号、设备状态、多根扫描与深度、APK 元数据、日志过滤、进程失败。自动化不替代真机验证；实际安装、文件传输、权限和 Gradle 构建受设备/项目环境影响。
+
+### 最近过滤配置
+
+点击“应用过滤”会自动保存最近 20 条有效配置（级别、关键词、正则开关、Tag、包名），相同配置去重并移到最前。从“最近过滤”下拉框选择后立即填入并应用。历史保存在当前 VS Code 配置的扩展存储中，重启后保留，工作区与 Logcat 标签页共享；其他标签页仅更新历史列表，不改变正在使用的过滤条件。离线使用含包名的配置时会跳过包名过滤，并保留历史中的完整配置。
 
 ### 导入离线日志
 

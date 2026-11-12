@@ -104,6 +104,21 @@ function importLogs(text, limit = 10000) {
   if (rows[rows.length - 1] === '') rows.pop();
   return { total: rows.length, entries: rows.slice(-limit).map(parseLog) };
 }
+function normalizeLogFilter(f) {
+  if (!f || typeof f.text !== 'string' || f.text.length > 300 || typeof f.tag !== 'string' || f.tag.length > 300 || !/^[VDIWEF]$/.test(f.level)) throw new Error('无效过滤条件');
+  if (f.regex && /\([^)]*[+*][^)]*\)[+*{]/.test(f.text)) throw new Error('请避免嵌套重复的正则表达式');
+  if (f.regex) new RegExp(f.text);
+  const next = String(f.package || '').trim(); if (next) packageName(next);
+  return { level: f.level, text: f.text, regex: !!f.regex, tag: f.tag, package: next };
+}
+function recentFilters(history, value) {
+  const next = normalizeLogFilter(value), key = JSON.stringify(next), entries = [next];
+  for (const item of Array.isArray(history) ? history : []) {
+    try { const f = normalizeLogFilter(item); if (JSON.stringify(f) !== key) entries.push(f); } catch { /* Ignore invalid entries from older versions. */ }
+    if (entries.length === 20) break;
+  }
+  return entries;
+}
 function filterLog(entry, filter, pids) {
   if ('VDIWEF'.indexOf(entry.level) < 'VDIWEF'.indexOf(filter.level || 'V')) return false;
   if (filter.tag && !entry.tag.includes(filter.tag)) return false;
@@ -111,4 +126,4 @@ function filterLog(entry, filter, pids) {
   if (!filter.text) return true;
   return filter.regex ? new RegExp(filter.text, 'i').test(entry.line) : entry.line.toLowerCase().includes(filter.text.toLowerCase());
 }
-module.exports = { quote, remotePath, filename, devices, run, Adb, discover, artifacts, packageName, parseLog, filterLog, importLogs };
+module.exports = { quote, remotePath, filename, devices, run, Adb, discover, artifacts, packageName, parseLog, filterLog, importLogs, normalizeLogFilter, recentFilters };
