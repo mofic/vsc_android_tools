@@ -1,7 +1,7 @@
 'use strict';
 const vscode = acquireVsCodeApi();
 const byId = id => document.getElementById(id);
-for (const id of ['newTab','split','apply','pause','clear','deviceClear','copy','import','export','restart']) byId(id).addEventListener('click', () => {
+for (const id of ['screenshot','record','newTab','split','apply','pause','clear','deviceClear','copy','import','export','restart']) byId(id).addEventListener('click', () => {
   if (id === 'apply') vscode.postMessage({ type: 'filter', filter: { level: byId('level').value, text: byId('text').value, regex: byId('regex').checked, tag: byId('tag').value, package: byId('package').value } });
   else vscode.postMessage({ type: id });
 });
@@ -21,6 +21,11 @@ window.addEventListener('message', ({ data }) => {
   if (data.type === 'filterApplied') {
     for (const id of ['level', 'text', 'tag', 'package']) byId(id).value = data.filter[id];
     byId('regex').checked = data.filter.regex;
+  }
+  if (data.type === 'captureState') {
+    byId('screenshot').disabled = !data.device || data.screenshotBusy;
+    byId('record').disabled = !data.device || data.recordingBusy;
+    byId('record').textContent = data.recordingBusy ? '处理中…' : (data.recording ? '停止录屏' : '开始录屏');
   }
   if (data.type === 'status') byId('status').textContent = data.text;
   if (data.type === 'paused') byId('pause').textContent = data.value ? '继续' : '暂停';

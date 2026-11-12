@@ -4,6 +4,7 @@ const { spawn } = require('node:child_process');
 const { StringDecoder } = require('node:string_decoder');
 const { randomBytes } = require('node:crypto');
 const path = require('node:path');
+const { screenshot, startRecording } = require('./capture');
 const { EventEmitter } = require('node:events');
 const { parseLog, filterLog, importLogs, normalizeLogFilter, recentFilters } = require('./core');
 let nextSession = 1;
@@ -35,9 +36,42 @@ function openLogcat(ctx, adb, serial, error, source, column = v.ViewColumn.Activ
   const script = panel.webview.asWebviewUri(v.Uri.joinPath(ctx.extensionUri, 'media', 'logcat.js'));
   const style = panel.webview.asWebviewUri(v.Uri.joinPath(ctx.extensionUri, 'media', 'logcat.css'));
   const offline = source ? 'disabled' : '';
-  panel.webview.html = `<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${panel.webview.cspSource}; script-src 'nonce-${nonce}'"><link rel="stylesheet" href="${style}"></head><body><header><button id="newTab" title="为当前设备或日志新建独立标签页">新建标签页</button><button id="split" title="在旁边打开独立 Logcat">分屏</button><label>最近过滤 <select id="history" aria-label="最近使用的过滤配置"><option value="">选择最近配置…</option></select></label><label>级别 <select id="level"><option>V</option><option>D</option><option>I</option><option>W</option><option>E</option><option>F</option></select></label><label>关键词 <input id="text" placeholder="过滤内容"></label><label><input id="regex" type="checkbox">正则</label><label>Tag <input id="tag"></label><label>包名 <input id="package" ${offline} title="包名过滤需要实时设备进程信息" placeholder="留空显示全部进程"></label><button id="apply">应用过滤</button><button id="pause" ${offline}>暂停</button><label><input id="scroll" type="checkbox" checked>自动滚动</label><button id="clear">清空视图</button><button id="deviceClear" ${offline}>清除设备日志</button><button id="copy">复制</button><button id="import">导入</button><button id="export">导出</button><button id="restart" ${offline}>重连</button></header><p id="status" role="status">连接中…</p><main id="logs" tabindex="0" aria-label="Logcat 日志"></main><script nonce="${nonce}" src="${script}"></script></body></html>`;
+  panel.webview.html = `<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${panel.webview.cspSource}; script-src 'nonce-${nonce}'"><link rel="stylesheet" href="${style}"></head><body><header><button id="newTab" title="为当前设备或日志新建独立标签页">新建标签页</button><button id="split" title="在旁边打开独立 Logcat">分屏</button><label>最近过滤 <select id="history" aria-label="最近使用的过滤配置"><option value="">选择最近配置…</option></select></label><label>级别 <select id="level"><option>V</option><option>D</option><option>I</option><option>W</option><option>E</option><option>F</option></select></label><label>关键词 <input id="text" placeholder="过滤内容"></label><label><input id="regex" type="checkbox">正则</label><label>Tag <input id="tag"></label><label>包名 <input id="package" ${offline} title="包名过滤需要实时设备进程信息" placeholder="留空显示全部进程"></label><button id="apply">应用过滤</button><button id="pause" ${offline}>暂停</button><label><input id="scroll" type="checkbox" checked>自动滚动</label><button id="clear">清空视图</button><button id="deviceClear" ${offline}>清除设备日志</button><button id="copy">复制</button><button id="import">导入</button><button id="export">导出</button><button id="restart" ${offline}>重连</button><button id="screenshot" ${offline}>设备截屏</button><button id="record" ${offline} title="无声 MP4，最长 180 秒">开始录屏</button></header><p id="status" role="status">连接中…</p><main id="logs" tabindex="0" aria-label="Logcat 日志"></main><script nonce="${nonce}" src="${script}"></script></body></html>`;
   let lines = source?.entries.slice() || [], filter = { level: 'V' }, pids, child, partial = '', paused = false, disposed = false, changed = true, packageId = '', checking = false;
+  let recording, screenshotBusy = false, recordingBusy = false;
   const send = message => { if (!disposed) panel.webview.postMessage(message); };
+  const captureState = () => send({ type: 'captureState', device: !!serial, recording: !!recording, screenshotBusy, recordingBusy });
+  async function captureScreenshot() {
+    if (!serial || screenshotBusy) return;
+    if (!v.workspace.isTrusted) throw new Error('请先信任工作区');
+    screenshotBusy = true; captureState();
+    try {
+      const uri = await v.window.showSaveDialog({ title: `设备截屏 · ${serial}`, defaultUri: v.Uri.file(`screenshot-${Date.now()}.png`), filters: { PNG: ['png'] } });
+      if (!uri || disposed) return;
+      if (uri.scheme !== 'file') throw new Error('请选择本地保存路径');
+      await screenshot(adb, serial, uri.fsPath);
+      v.window.showInformationMessage(`截图已保存：${uri.fsPath}`);
+      await v.commands.executeCommand('vscode.open', uri);
+    } finally { screenshotBusy = false; captureState(); }
+  }
+  async function toggleRecording() {
+    if (!serial || recordingBusy) return;
+    if (!v.workspace.isTrusted) throw new Error('请先信任工作区');
+    recordingBusy = true; captureState();
+    if (recording) {
+      try { await recording.stop(); } catch(e) { recordingBusy = false; captureState(); throw e; }
+      return;
+    }
+    try {
+      const uri = await v.window.showSaveDialog({ title: `录屏保存位置 · ${serial}`, defaultUri: v.Uri.file(`recording-${Date.now()}.mp4`), filters: { MP4: ['mp4'] } });
+      if (!uri || disposed) { recordingBusy = false; captureState(); return; }
+      if (uri.scheme !== 'file') throw new Error('请选择本地保存路径');
+      const session = startRecording(adb, serial, uri.fsPath); recording = session;
+      session.done.then(() => v.window.showInformationMessage(`录屏已保存：${uri.fsPath}`), error).finally(() => { if (recording === session) { recording = undefined; recordingBusy = false; captureState(); } });
+      await session.ready.catch(() => {});
+      recordingBusy = false; captureState();
+    } catch(e) { recordingBusy = false; captureState(); throw e; }
+  }
   const sendHistory = () => send({ type: 'history', filters: ctx.globalState.get('logcat.recentFilters', []) });
   historyEvents.on('changed', sendHistory);
   function filtered() { return lines.filter(entry => filterLog(entry, filter, pids)); }
@@ -68,12 +102,14 @@ function openLogcat(ctx, adb, serial, error, source, column = v.ViewColumn.Activ
     try {
       switch (message.type) {
         case 'ready':
-          sendHistory();
+          sendHistory(); captureState();
           if (source) { send({ type: 'status', text: `已导入 ${source.name} · ${source.total} 行${source.total > lines.length ? `，显示最后 ${lines.length} 行` : ''} · 离线模式` }); send({ type: 'lines', lines: filtered() }); changed = false; }
           else start(); break;
         case 'newTab': openLogcat(ctx, adb, serial, error, source); break;
         case 'split': openLogcat(ctx, adb, serial, error, source, v.ViewColumn.Beside); break;
         case 'import': await importLogcat(ctx, adb, error); break;
+        case 'screenshot': await captureScreenshot(); break;
+        case 'record': await toggleRecording(); break;
         case 'restart': start(); break;
         case 'filter':
         case 'useFilter': {
@@ -95,7 +131,7 @@ function openLogcat(ctx, adb, serial, error, source, column = v.ViewColumn.Activ
       }
     } catch(e) { error(e); }
   });
-  const cleanup = () => { historyEvents.off('changed', sendHistory); disposed = true; child?.kill(); child = undefined; lines = []; source = undefined; pids = undefined; clearInterval(render); clearInterval(track); };
+  const cleanup = () => { historyEvents.off('changed', sendHistory); disposed = true; recording?.stop().catch(error); child?.kill(); child = undefined; lines = []; source = undefined; pids = undefined; clearInterval(render); clearInterval(track); };
   panel.onDidDispose(cleanup); ctx.subscriptions.push(panel, { dispose: cleanup });
   return panel;
 }

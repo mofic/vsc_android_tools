@@ -5,7 +5,7 @@ VS Code 安卓设备管理插件，支持原生 Android Gradle 项目和多根�
 ## 安装与运行
 
 1. 安装 Android SDK Platform Tools，在终端确认 `adb devices -l` 能看到已授权设备。
-2. 在 VS Code 执行 **Extensions: Install from VSIX…**，选择本仓库生成的 `android-device-tools-0.1.7.vsix`。
+2. 在 VS Code 执行 **Extensions: Install from VSIX…**，选择本仓库生成的 `android-device-tools-0.1.8.vsix`。
 3. 打开左侧 Android Tools 图标，点击设备选中目标。ADB 不在 PATH 时设置 `androidTools.adbPath`。
 4. 使用命令面板搜索 `Android Tools` 执行应用和文件操作；文件树提供右键菜单。
 
@@ -42,6 +42,14 @@ VS Code 安卓设备管理插件，支持原生 Android Gradle 项目和多根�
 ## 验证范围
 
 `node:test` 覆盖路径与 shell 引号、设备状态、多根扫描与深度、APK 元数据、日志过滤、进程失败。自动化不替代真机验证；实际安装、文件传输、权限和 Gradle 构建受设备/项目环境影响。
+
+### 截屏与录屏
+
+实时 Logcat 顶部提供“设备截屏”和“开始录屏 / 停止录屏”，绑定该标签页设备。先选择本地保存路径，取消不会启动采集。截屏保存 PNG 后用 VS Code 打开；录屏保存 MP4，不含音频，最长 180 秒后自动结束并保存。关闭标签页会尝试停止该页发起的录屏并完成保存；同一设备同一时间只能由一个标签页录屏，不同设备可分别录制。离线页禁用采集，工作区需已信任。
+
+停止录屏只向本次启动的设备进程发送 SIGINT，不会批量终止其他录屏进程。本地下载通过临时文件和同目录重命名完成；传输失败不会覆盖原有本地文件，设备文件保留，错误提示给出恢复路径。退出 VS Code 可能中断下载，请先停止并确认保存；设备录制仍有 180 秒时间上限。
+
+实现使用 Android 原生 `screencap` / `screenrecord`：[官方 ADB 文档](https://developer.android.com/tools/adb)。
 
 ### 最近过滤配置
 
