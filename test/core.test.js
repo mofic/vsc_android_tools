@@ -45,3 +45,13 @@ test('process errors and nonzero exit reject', async()=>{
   await assert.rejects(c.run('missing-android-tools-binary',[]));
   assert.equal(await c.run(process.execPath,['-e','process.stdout.write("ok")']),'ok');
 });
+test('directory listing distinguishes links and resolves relative link targets', async () => {
+  const adb = new c.Adb(() => 'adb');
+  adb.exec = async () => ['D','folder','','LD','sdcard','/storage/emulated/0','LF','alias','../real.txt','F',"a ' b.txt",''].join('\0') + '\0';
+  const entries = await adb.list('serial','/example');
+  assert.equal(entries.find(e=>e.name==='sdcard').directory, true);
+  assert.equal(entries.find(e=>e.name==='sdcard').symlink, true);
+  assert.equal(entries.find(e=>e.name==='sdcard').target, '/storage/emulated/0');
+  assert.equal(entries.find(e=>e.name==='alias').target, '/real.txt');
+  assert.equal(entries.find(e=>e.name==="a ' b.txt").symlink, false);
+});

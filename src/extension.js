@@ -9,7 +9,7 @@ function activate(ctx) {
   const adb = new c.Adb(() => v.workspace.getConfiguration('androidTools').get('adbPath', 'adb'));
   const output = v.window.createOutputChannel('Android Tools');
   let selected, deviceList = [], root = '/sdcard', project = ctx.workspaceState.get('project');
-  const edited = new Map();
+  const edited = new Map(), opening = new Map();
   const deviceEvent = new v.EventEmitter(), fileEvent = new v.EventEmitter();
   const status = v.window.createStatusBarItem(v.StatusBarAlignment.Left);
   status.command = 'androidTools.selectDevice'; status.text = '$(device-mobile) Android: 选择设备'; status.show();
@@ -77,11 +77,12 @@ function activate(ctx) {
   }};
   const filesProvider = { onDidChangeTreeData: fileEvent.event, getChildren: async item => {
     if (!selected && !item) return [];
-    const serial = item?.serial || selected, dir = item?.remote || root;
+    const serial = item?.serial || selected, dir = item?.target || item?.remote || root;
     try { return (await adb.list(serial, dir)).map(f => ({ ...f, remote: path.posix.join(dir, f.name), serial })); } catch (e) { error(e); return []; }
   }, getTreeItem: f => {
     const item = new v.TreeItem(f.name, f.directory ? v.TreeItemCollapsibleState.Collapsed : v.TreeItemCollapsibleState.None);
-    item.tooltip = `${f.serial}:${f.remote}`; item.iconPath = new v.ThemeIcon(f.directory ? 'folder' : 'file');
+    item.tooltip = `${f.serial}:${f.remote}${f.symlink ? ` → ${f.target}` : ''}`;
+    item.iconPath = new v.ThemeIcon(f.symlink ? (f.directory ? 'file-symlink-directory' : 'file-symlink-file') : (f.directory ? 'folder' : 'file'));
     if (!f.directory) item.command = { command: 'androidTools.open', title: '编辑', arguments: [f] }; return item;
   }};
   const handlers = {
@@ -96,11 +97,21 @@ function activate(ctx) {
     browse: async () => { await device(); const value = await v.window.showInputBox({ value: root, prompt: '设备绝对路径' }); if (value) { root = c.remotePath(value); fileEvent.fire(); } },
     open: async item => {
       const t = await target(item); if (t.directory) return;
-      const temp = await fs.mkdtemp(path.join(os.tmpdir(), 'android-tools-'));
-      const local = path.join(temp, c.filename(path.posix.basename(t.remote)));
-      await progress(`下载 ${t.serial}:${t.remote}`, opts => adb.exec(t.serial, ['pull', t.remote, local], opts));
-      edited.set(local, { ...t, temp }); await v.window.showTextDocument(v.Uri.file(local));
-      v.window.showInformationMessage('编辑后使用 Android Tools: 保存编辑到设备，显式上传。');
+      const remote = c.remotePath(t.target || t.remote), key = `${t.serial}:${remote}`;
+      let local = [...edited].find(([, entry]) => entry.serial === t.serial && entry.remote === remote)?.[0];
+      if (local) { try { await fs.access(local); } catch { local = undefined; } }
+      if (!local) {
+        if (!opening.has(key)) opening.set(key, (async () => {
+          const temp = await fs.mkdtemp(path.join(os.tmpdir(), 'android-tools-'));
+          const file = path.join(temp, c.filename(path.posix.basename(remote)));
+          try {
+            await progress(`打开 ${t.serial}:${remote}`, opts => adb.exec(t.serial, ['pull', remote, file], opts));
+            edited.set(file, { ...t, remote, temp }); return file;
+          } catch (e) { await fs.rm(temp, { recursive: true, force: true }); throw e; }
+        })());
+        try { local = await opening.get(key); } finally { opening.delete(key); }
+      }
+      await v.commands.executeCommand('vscode.open', v.Uri.file(local), { preview: false });
     },
     save: async () => {
       trust(); const doc = v.window.activeTextEditor?.document, t = edited.get(doc?.uri.fsPath);

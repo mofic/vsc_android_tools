@@ -37,9 +37,26 @@ class Adb {
   exec(serial, args, options) { return run(this.binary(), serial ? ['-s', serial, ...args] : args, options); }
   shell(serial, args, options) { return this.exec(serial, ['shell', args.map(quote).join(' ')], options); }
   async list(serial, dir) {
-    // shortcut: Android toybox ls -p，包含换行符的文件名不支持，需二进制目录协议时升级。
-    const output = await this.shell(serial, ['ls', '-1Ap', '--', remotePath(dir)]);
-    return output.split(/\r?\n/).filter(Boolean).map(x => ({ name: x.endsWith('/') ? x.slice(0, -1) : x, directory: x.endsWith('/') })).sort((a,b) => Number(b.directory)-Number(a.directory) || a.name.localeCompare(b.name));
+    const directory = remotePath(dir);
+    const script = `cd ${quote(directory)} || exit 1
+[ -r . ] && [ -x . ] || { echo 'Permission denied' >&2; exit 1; }
+for entry in .[!.]* ..?* *; do
+  [ -e "$entry" ] || [ -L "$entry" ] || continue
+  target=''; kind=F
+  if [ -L "$entry" ]; then
+    target=$(readlink -f -- "$entry") || target=$(readlink -- "$entry") || exit 1
+    if [ -d "$entry" ]; then kind=LD; else kind=LF; fi
+  elif [ -d "$entry" ]; then kind=D; fi
+  printf '%s\\000%s\\000%s\\000' "$kind" "$entry" "$target"
+done`;
+    const fields = (await this.exec(serial, ['shell', script])).split('\0');
+    const entries = [];
+    for (let i = 0; i + 2 < fields.length; i += 3) {
+      const [kind, name, target] = fields.slice(i, i + 3);
+      filename(name);
+      entries.push({ name, directory: kind === 'D' || kind === 'LD', symlink: kind.startsWith('L'), target: target ? remotePath(path.posix.resolve(directory, target)) : undefined });
+    }
+    return entries.sort((a,b) => Number(b.directory)-Number(a.directory) || a.name.localeCompare(b.name));
   }
 }
 const excluded = new Set(['node_modules', '.git', '.gradle', '.idea', 'build', '.dart_tool']);

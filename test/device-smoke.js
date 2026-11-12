@@ -11,6 +11,7 @@ const c = require('../src/core');
   assert.ok(c.devices(await adb.exec(null,['devices','-l'])).some(d=>d.serial===serial && d.state==='device'));
   const local = await fs.mkdtemp(path.join(os.tmpdir(),'android-device-smoke-'));
   const remote = '/sdcard/AndroidToolsSmoke-' + Date.now();
+  const links = '/data/local/tmp/AndroidToolsLinks-' + Date.now();
   try {
     await adb.shell(serial,['mkdir',remote]);
     const source = path.join(local,"hello ' 世界.txt");
@@ -27,6 +28,21 @@ const c = require('../src/core');
     assert.equal(await fs.readFile(path.join(local,'received','child.txt'),'utf8'),'nested');
     assert.ok((await adb.list(serial,remote)).some(f=>f.name==='folder' && f.directory));
     const log=await adb.exec(serial,['logcat','-d','-t','10','-v','threadtime']); assert.ok(log.length);
+    await adb.shell(serial,['mkdir',links]);
+    await adb.shell(serial,['ln','-s',remote+'/renamed.txt',links+'/file-link']);
+    await adb.shell(serial,['ln','-s',remote+'/folder',links+'/folder-link']);
+    await adb.shell(serial,['ln','-s','missing',links+'/broken-link']);
+    const linkEntries = await adb.list(serial,links);
+    assert.ok(linkEntries.find(f=>f.name==='file-link').symlink);
+    assert.equal(linkEntries.find(f=>f.name==='file-link').target, await adb.shell(serial,['readlink','-f',remote+'/renamed.txt']).then(s=>s.trim()));
+    assert.ok(linkEntries.find(f=>f.name==='folder-link').directory);
+    assert.ok((await adb.list(serial,linkEntries.find(f=>f.name==='folder-link').target)).some(f=>f.name==='child.txt'));
+    assert.ok(linkEntries.find(f=>f.name==='broken-link').symlink);
+    const linkDownload=path.join(local,'link-target.txt');
+    await adb.exec(serial,['pull',linkEntries.find(f=>f.name==='file-link').target,linkDownload]);
+    assert.equal(await fs.readFile(linkDownload,'utf8'),'edited 世界\n');
+    const sdcard = (await adb.list(serial,'/')).find(f=>f.name==='sdcard');
+    assert.ok(sdcard.symlink && sdcard.directory); console.log('PASS: /sdcard directory link, file link target, broken link, linked folder expansion');
     console.log('PASS: device, list, create, upload, overwrite, rename, download, recursive transfer, logcat');
-  } finally { await adb.shell(serial,['rm','-rf',remote]); await fs.rm(local,{recursive:true,force:true}); }
+  } finally { await adb.shell(serial,['rm','-rf',remote,links]); await fs.rm(local,{recursive:true,force:true}); }
 })().catch(e=>{console.error(e);process.exitCode=1;});
