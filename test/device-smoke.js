@@ -34,7 +34,7 @@ const c = require('../src/core');
     await adb.shell(serial,['ln','-s','missing',links+'/broken-link']);
     const linkEntries = await adb.list(serial,links);
     assert.ok(linkEntries.find(f=>f.name==='file-link').symlink);
-    assert.equal(linkEntries.find(f=>f.name==='file-link').target, await adb.shell(serial,['readlink','-f',remote+'/renamed.txt']).then(s=>s.trim()));
+    assert.equal(linkEntries.find(f=>f.name==='file-link').target, remote+'/renamed.txt');
     assert.ok(linkEntries.find(f=>f.name==='folder-link').directory);
     assert.ok((await adb.list(serial,linkEntries.find(f=>f.name==='folder-link').target)).some(f=>f.name==='child.txt'));
     assert.ok(linkEntries.find(f=>f.name==='broken-link').symlink);

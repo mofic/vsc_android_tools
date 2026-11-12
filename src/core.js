@@ -38,25 +38,27 @@ class Adb {
   shell(serial, args, options) { return this.exec(serial, ['shell', args.map(quote).join(' ')], options); }
   async list(serial, dir) {
     const directory = remotePath(dir);
+    // Android mksh runs printf externally; batch names to avoid one process per entry.
     const script = `cd ${quote(directory)} || exit 1
 [ -r . ] && [ -x . ] || { echo 'Permission denied' >&2; exit 1; }
+printf 'P\\000%s\\000\\000' "$(pwd -P)"
+set --; count=0
 for entry in .[!.]* ..?* *; do
-  [ -e "$entry" ] || [ -L "$entry" ] || continue
-  target=''; kind=F
-  if [ -L "$entry" ]; then
-    target=$(readlink -f -- "$entry") || target=$(readlink -- "$entry") || exit 1
-    if [ -d "$entry" ]; then kind=LD; else kind=LF; fi
-  elif [ -d "$entry" ]; then kind=D; fi
-  printf '%s\\000%s\\000%s\\000' "$kind" "$entry" "$target"
-done`;
-    const fields = (await this.exec(serial, ['shell', script])).split('\0');
-    const entries = [];
+  case "$entry" in '.[!.]*'|'..?*'|'*') [ -e "$entry" ] || [ -L "$entry" ] || continue;; esac
+  set -- "$@" "$entry"; count=$((count+1))
+  if [ "$count" -eq 256 ]; then printf 'U\\000%s\\000\\000' "$@"; set --; count=0; fi
+done
+[ "$#" -eq 0 ] || printf 'U\\000%s\\000\\000' "$@"
+find -L . -mindepth 1 -maxdepth 1 -printf '%M\\000%f\\000%l\\000' 2>/dev/null || true`;
+    const fields = (await this.exec(serial, ['shell', script], { timeout: 15000 })).split('\0');
+    const entries = new Map();
+    let physicalDirectory = directory;
     for (let i = 0; i + 2 < fields.length; i += 3) {
       const [kind, name, target] = fields.slice(i, i + 3);
-      filename(name);
-      entries.push({ name, directory: kind === 'D' || kind === 'LD', symlink: kind.startsWith('L'), target: target ? remotePath(path.posix.resolve(directory, target)) : undefined });
+      if (kind === 'P') { physicalDirectory = name; continue; }
+      entries.set(name, { name, directory: kind.startsWith('d'), symlink: !!target || kind.startsWith('l'), unknown: kind === 'U', target: target ? path.posix.resolve(physicalDirectory, target) : undefined });
     }
-    return entries.sort((a,b) => Number(b.directory)-Number(a.directory) || a.name.localeCompare(b.name));
+    return [...entries.values()].sort((a,b) => Number(b.directory)-Number(a.directory) || a.name.localeCompare(b.name));
   }
 }
 const excluded = new Set(['node_modules', '.git', '.gradle', '.idea', 'build', '.dart_tool']);

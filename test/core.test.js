@@ -47,7 +47,7 @@ test('process errors and nonzero exit reject', async()=>{
 });
 test('directory listing distinguishes links and resolves relative link targets', async () => {
   const adb = new c.Adb(() => 'adb');
-  adb.exec = async () => ['D','folder','','LD','sdcard','/storage/emulated/0','LF','alias','../real.txt','F',"a ' b.txt",''].join('\0') + '\0';
+  adb.exec = async () => ['drwxr-xr-x','folder','','drwxr-xr-x','sdcard','/storage/emulated/0','-rw-r--r--','alias','../real.txt','-rw-r--r--',"a ' b.txt",''].join('\0') + '\0';
   const entries = await adb.list('serial','/example');
   assert.equal(entries.find(e=>e.name==='sdcard').directory, true);
   assert.equal(entries.find(e=>e.name==='sdcard').symlink, true);
@@ -74,4 +74,21 @@ test('recent filters validate, deduplicate, move reused entries first and retain
   assert.throws(()=>c.recentFilters(history,{...first,regex:true,text:'['}));
   assert.throws(()=>c.normalizeLogFilter({...first,package:'com.foo;id'}));
   assert.deepEqual(c.recentFilters([null,{bad:true}],first),[first]);
+});
+
+test('batch directory metadata preserves inaccessible, hidden and special entries', async () => {
+  const adb=new c.Adb(()=> 'adb');let script;
+  adb.exec=async(_,args)=>{script=args[1];return ['U','restricted','','U','.hidden','','U','link','', 'drwxr-xr-x','folder','','-rw-r--r--','.hidden','','drwxr-xr-x','link','../folder','prw-------','pipe',''].join('\0')+'\0';};
+  const entries=await adb.list('serial','/parent/sub');
+  assert.equal(entries.find(e=>e.name==='restricted').unknown,true);
+  assert.equal(entries.find(e=>e.name==='.hidden').unknown,false);
+  assert.equal(entries.find(e=>e.name==='link').directory,true);
+  assert.equal(entries.find(e=>e.name==='link').target,'/parent/folder');
+  assert.ok(entries.some(e=>e.name==='pipe'));
+  assert.ok(!/readlink|\bpull\b/.test(script));
+});
+
+test('relative links inside aliased directory use its physical parent',async()=>{
+  const adb=new c.Adb(()=> 'adb');adb.exec=async()=>['P','/real/nested','','lrwxrwxrwx','link','../file'].join('\0')+'\0';
+  assert.equal((await adb.list('serial','/alias'))[0].target,'/real/file');
 });

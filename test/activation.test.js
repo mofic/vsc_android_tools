@@ -20,14 +20,15 @@ test('activates every contributed command and tree, then disposes timers', async
     Uri:{file:fsPath=>({fsPath})},ProgressLocation:{Notification:1},StatusBarAlignment:{Left:1},EventEmitter:class{event=()=>{};fire(){}dispose(){}},
     TreeItem:class{constructor(label){this.label=label}},ThemeIcon:class{constructor(id){this.id=id}},TreeItemCollapsibleState:{Collapsed:1,None:0}
   };
-  const original=Module._load, exec=Adb.prototype.exec;
+  const original=Module._load, exec=Adb.prototype.exec, originalInterval=global.setInterval;
+  let poll; global.setInterval=fn=>{poll=fn;return {};};
   Module._load=function(id,...args){return id==='vscode'?mock:original.call(this,id,...args)};
   Adb.prototype.exec=async(serial,args)=> {
     if (args[0] === 'devices') return 'List of devices attached\nserial device model:Pixel\n';
     calls.push({ serial, args });
     if (inaccessible) throw new Error('Permission denied');
     if (args[0] === 'pull') { await fs.writeFile(args[2], 'target content'); return ''; }
-    return ['D','files','','LD','sdcard','/storage/emulated/0','LF','alias','/real.txt'].join('\0') + '\0';
+    return ['drwxr-xr-x','files','','drwxr-xr-x','sdcard','/storage/emulated/0','-rw-r--r--','alias','/real.txt'].join('\0') + '\0';
   };
   try {
     const extension=require('../src/extension');
@@ -41,7 +42,17 @@ test('activates every contributed command and tree, then disposes timers', async
     await commands.get('androidTools.openAppDirectory')();
     assert.equal(state.get(`package:${project}`), 'com.example.debug');
     assert.ok(calls.includes('androidFiles.focus'));
-    const children = await trees.get('androidFiles').getChildren();
+    const listCount = () => calls.filter(call=>call.args?.[0]==='shell').length;
+    const beforeListing = listCount();
+    const [children] = await Promise.all([trees.get('androidFiles').getChildren(), trees.get('androidFiles').getChildren()]);
+    assert.equal(listCount(),beforeListing); // App-directory validation already cached this listing.
+    await poll(); await trees.get('androidFiles').getChildren();
+    assert.equal(listCount(),beforeListing);
+    assert.ok(!calls.some(call=>['pull','push'].includes(call.args?.[0])));
+    await commands.get('androidTools.refresh')();
+    const beforeReload=listCount();
+    await Promise.all([trees.get('androidFiles').getChildren(),trees.get('androidFiles').getChildren()]);
+    assert.equal(listCount(),beforeReload+1);
     assert.equal(children[0].parent, true);
     const parentItem = trees.get('androidFiles').getTreeItem(children[0]);
     assert.equal(parentItem.command.command, 'androidTools.goParent');
@@ -70,9 +81,9 @@ test('activates every contributed command and tree, then disposes timers', async
     mock.window.activeTextEditor={document:{uri:opened[0].uri,save:async()=>true}};
     await commands.get('androidTools.save')();
     assert.equal(calls.find(call=>call.args?.[0]==='push').args[2], '/real.txt');
-    inaccessible = true;
+    inaccessible = true; await commands.get('androidTools.refresh')();
     await commands.get('androidTools.openAppDirectory')();
     assert.match(errors.pop(), /目录不存在或无权访问/);
     assert.ok(!calls.some(call => typeof call === 'object' && /\b(mkdir|touch|rm)\b/.test(call.args.join(' '))));
-  } finally {for(const item of subscriptions)item.dispose();Module._load=original;Adb.prototype.exec=exec;await fs.rm(project,{recursive:true,force:true});}
+  } finally {for(const item of subscriptions)item.dispose();Module._load=original;Adb.prototype.exec=exec;global.setInterval=originalInterval;await fs.rm(project,{recursive:true,force:true});}
 });
