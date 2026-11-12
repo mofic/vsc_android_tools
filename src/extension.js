@@ -56,6 +56,17 @@ function activate(ctx) {
     if (!value) return;
     c.packageName(value); await ctx.workspaceState.update(`package:${project}`, value); return value;
   }
+  async function currentPackage() {
+    const p = await getProject(), remembered = ctx.workspaceState.get(`package:${p}`);
+    if (remembered) return c.packageName(remembered);
+    const packages = [...new Set((await c.artifacts(p)).map(a => a.packageName).filter(Boolean))];
+    let value;
+    if (packages.length === 1) value = packages[0];
+    else if (packages.length > 1) value = await v.window.showQuickPick(packages, { placeHolder: '选择当前项目的应用包名（记住本次选择）' });
+    else value = await v.window.showInputBox({ prompt: '项目尚无 APK 元数据，请输入 applicationId（将记住）' });
+    if (!value) return;
+    c.packageName(value); await ctx.workspaceState.update(`package:${p}`, value); return value;
+  }
   async function confirm(message) { return await v.window.showWarningMessage(message, { modal: true }, '确认') === '确认'; }
   async function progress(title, action) { return v.window.withProgress({ location: v.ProgressLocation.Notification, title, cancellable: true }, (_, token) => action({ token, timeout: 1800000, onOutput: s => output.append(s) })); }
   function node(item) { return item || { remote: root, directory: true, serial: selected }; }
@@ -75,6 +86,13 @@ function activate(ctx) {
   }};
   const handlers = {
     refresh, selectDevice: chooseDevice, selectProject: chooseProject,
+    openAppDirectory: async () => {
+      const serial = await device(), packageId = await currentPackage(); if (!packageId) return;
+      const directory = `/sdcard/Android/data/${packageId}`;
+      try { await adb.list(serial, directory); }
+      catch (e) { throw new Error(`目录不存在或无权访问：${serial}:${directory}。请确认该变体已安装并创建了外部存储目录。${e.message}`); }
+      root = directory; fileEvent.fire(); await v.commands.executeCommand('androidFiles.focus');
+    },
     browse: async () => { await device(); const value = await v.window.showInputBox({ value: root, prompt: '设备绝对路径' }); if (value) { root = c.remotePath(value); fileEvent.fire(); } },
     open: async item => {
       const t = await target(item); if (t.directory) return;
@@ -113,7 +131,8 @@ function activate(ctx) {
       const a = await artifact(); if (!a) return;
       if (a.filters.length) throw new Error('此 APK 含拆分过滤条件，请使用通用 APK 或手动安装完整 APK 集');
       await progress(`安装 ${serial}`, opts => adb.exec(serial, ['install', '-r', a.apk], opts));
-      await launch(serial, c.packageName(a.packageName));
+      await ctx.workspaceState.update(`package:${p}`, c.packageName(a.packageName));
+      await launch(serial, a.packageName);
     },
     install: async () => { trust(); const serial = await device(); const files = await v.window.showOpenDialog({ canSelectMany: true, filters: { APK: ['apk'] } }); if (!files?.length) return;
       await progress(`安装到 ${serial}`, opts => adb.exec(serial, [files.length > 1 ? 'install-multiple' : 'install', '-r', ...files.map(f => f.fsPath)], opts)); },

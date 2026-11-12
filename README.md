@@ -5,7 +5,7 @@ VS Code 安卓设备管理插件，支持原生 Android Gradle 项目和多根�
 ## 安装与运行
 
 1. 安装 Android SDK Platform Tools，在终端确认 `adb devices -l` 能看到已授权设备。
-2. 在 VS Code 执行 **Extensions: Install from VSIX…**，选择本仓库生成的 `android-device-tools-0.1.0.vsix`。
+2. 在 VS Code 执行 **Extensions: Install from VSIX…**，选择本仓库生成的 `android-device-tools-0.1.2.vsix`。
 3. 打开左侧 Android Tools 图标，点击设备选中目标。ADB 不在 PATH 时设置 `androidTools.adbPath`。
 4. 使用命令面板搜索 `Android Tools` 执行应用和文件操作；文件树提供右键菜单。
 
@@ -14,6 +14,8 @@ VS Code 安卓设备管理插件，支持原生 Android Gradle 项目和多根�
 ## 设备与文件
 
 每 5 秒刷新设备；未授权和离线设备不能选中。默认浏览 `/sdcard`，使用“跳转设备目录”访问其他 ADB 可读目录。文件树支持创建、重命名、删除、上传和下载文件/文件夹。
+
+侧栏顶部的“打开当前应用目录”图标可直达 `/sdcard/Android/data/<applicationId>`，并聚焦文件树。包名优先使用当前项目记住的选择，否则从 APK 元数据识别；多个包名时选择一次，无构建产物时可手动输入。构建安装成功后会自动记住所选包名。切换变体时可通过应用操作中的包名确认更新选择。目录不存在或无权访问时提示原因，不自动创建，也不访问私有 `/data/user/...` 目录。
 
 单击文件下载本地副本并打开；编辑后执行 **保存编辑到设备**，确认覆盖原文件。编辑副本绑定下载时的设备，即使切换设备也不会写错设备。退出扩展后删除临时副本，请及时上传或另存为。上传/下载文件夹会合并目录并覆盖同名文件，操作前有确认；取消可能留下部分文件，不支持事务回滚。
 
