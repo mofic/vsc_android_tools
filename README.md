@@ -5,7 +5,7 @@ VS Code 安卓设备管理插件，支持原生 Android Gradle 项目和多根�
 ## 安装与运行
 
 1. 安装 Android SDK Platform Tools，在终端确认 `adb devices -l` 能看到已授权设备。
-2. 在 VS Code 执行 **Extensions: Install from VSIX…**，选择本仓库生成的 `android-device-tools-0.1.5.vsix`。
+2. 在 VS Code 执行 **Extensions: Install from VSIX…**，选择本仓库生成的 `android-device-tools-0.1.6.vsix`。
 3. 打开左侧 Android Tools 图标，点击设备选中目标。ADB 不在 PATH 时设置 `androidTools.adbPath`。
 4. 使用命令面板搜索 `Android Tools` 执行应用和文件操作；文件树提供右键菜单。
 
@@ -32,6 +32,8 @@ VS Code 安卓设备管理插件，支持原生 Android Gradle 项目和多根�
 构建、设备写入和应用操作要求工作区已信任。
 
 ## Logcat
+
+支持多个原生 VS Code 标签页，每页标题带独立编号。点击 Logcat 内“新建标签页”可为同一设备或离线日志多开；“分屏”在旁边编辑器组打开，便于对比。也可多次执行“打开 Logcat”查看不同设备。各页过滤、日志缓冲、暂停和清屏独立；关闭一页仅停止该页采集。新建页从默认过滤条件开始。注意“清除设备日志”操作作用于设备缓冲区，会影响该设备的所有实时页。
 
 每个面板绑定自己的设备；可同时打开多个设备面板。按 V/D/I/W/E/F 级别着色，支持最低级别、Tag、关键词、正则、包名过滤。包名每 1.5 秒重新查询进程表，跟随应用重启，同时包含 `:remote` 等子进程。
 

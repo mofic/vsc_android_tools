@@ -7,7 +7,7 @@ test('offline import renders, filters, exports without ADB; cancel and size erro
   let onMessage, cancelled=false, size=100, clipboard='', exported;
   const uri={fsPath:'/tmp/sample.log'}, content='11-12 12:13:14.123  123  456 E App: failure\n11-12 12:13:14.124  123  456 D Other: debug\n';
   const mock={
-    Uri:{joinPath:(_, ...parts)=>parts.join('/'),file:fsPath=>({fsPath})},ViewColumn:{One:1},
+    Uri:{joinPath:(_, ...parts)=>parts.join('/'),file:fsPath=>({fsPath})},ViewColumn:{Active:-1,Beside:-2},
     window:{showOpenDialog:async()=>cancelled?undefined:[uri],showSaveDialog:async()=>uri,createWebviewPanel:()=>{
       const panel={webview:{asWebviewUri:x=>x,cspSource:'test',postMessage:m=>messages.push(m),onDidReceiveMessage:fn=>{onMessage=fn;}},onDidDispose(){},dispose(){}};
       panels.push(panel);return panel;
