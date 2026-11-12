@@ -5,7 +5,7 @@ VS Code 安卓设备管理插件，支持原生 Android Gradle 项目和多根�
 ## 安装与运行
 
 1. 安装 Android SDK Platform Tools，在终端确认 `adb devices -l` 能看到已授权设备。
-2. 在 VS Code 执行 **Extensions: Install from VSIX…**，选择本仓库生成的 `android-device-tools-0.1.8.vsix`。
+2. 在 VS Code 执行 **Extensions: Install from VSIX…**，选择本仓库生成的 `android-device-tools-0.1.9.vsix`。
 3. 打开左侧 Android Tools 图标，点击设备选中目标。ADB 不在 PATH 时设置 `androidTools.adbPath`。
 4. 使用命令面板搜索 `Android Tools` 执行应用和文件操作；文件树提供右键菜单。
 
@@ -42,6 +42,10 @@ VS Code 安卓设备管理插件，支持原生 Android Gradle 项目和多根�
 ## 验证范围
 
 `node:test` 覆盖路径与 shell 引号、设备状态、多根扫描与深度、APK 元数据、日志过滤、进程失败。自动化不替代真机验证；实际安装、文件传输、权限和 Gradle 构建受设备/项目环境影响。
+
+### 日志内搜索
+
+“日志内搜索”在当前页已显示的日志中查找文本，忽略大小写，高亮所有匹配并显示当前位置/总数，不隐藏其他行，也不保存到过滤历史。实时页和导入离线页均支持。使用 ↑/↓ 或 Enter/Shift+Enter 循环切换匹配，Ctrl/Cmd+F 聚焦搜索，Escape 清空。输入搜索内容会关闭自动滚动，避免新日志打断定位；需要继续跟随日志时重新勾选“自动滚动”。搜索范围受当前过滤条件和最近 10000 行缓冲上限约束。
 
 ### 截屏与录屏
 
