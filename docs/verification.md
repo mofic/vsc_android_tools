@@ -102,3 +102,8 @@
 - 项目应用面板增加时间设置、语言设置（系统语言列表）、开发者选项，均仅依赖所选设备。复用应用设置的启动和错误反馈逻辑，不修改系统配置。
 - npm test 26 项、npm run check、git diff --check 通过；验证三个按钮的命令白名单、Intent 与设备绑定，以及启动失败反馈。
 - 在 Pixel 4a 上通过 cmd package resolve-activity 只读确认 DATE_SETTINGS、LOCALE_SETTINGS、APPLICATION_DEVELOPMENT_SETTINGS 均解析到系统 Settings Activity，未做页面交互验证。
+
+## 0.2.6 应用操作与设备设置分区（2026-11-12）
+
+- 时间设置、语言设置、开发者选项移至独立“设备设置”区域，使用主题分隔线、标题和留白与应用操作区分。应用设置保留在应用操作区域。
+- npm test 26 项及 npm run check 通过，现有面板测试补充三个设备按钮与应用设置的分组断言。未做真实窗口视觉验证；操作逻辑未变。

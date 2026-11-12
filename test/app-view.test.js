@@ -11,6 +11,11 @@ test('project app panel exposes all operations, updates targets and rejects unkn
   const update=registerAppView({subscriptions,extensionUri:'test'},()=>state,async id=>{executed.push(id);await new Promise(resolve=>{finish=resolve;});});
   const view={webview:{cspSource:'test',asWebviewUri:x=>x,postMessage:m=>messages.push(m),onDidReceiveMessage:fn=>{receive=fn;return{dispose(){}};}},onDidDispose:()=>({dispose(){}})};
   provider.resolveWebviewView(view);
+  const settingsSection=view.webview.html.match(/<section class="device-settings"[\s\S]*?<\/section>/)[0];
+  for(const id of ['dateSettings','languageSettings','developerSettings']) assert.ok(settingsSection.includes(`data-command="${id}"`));
+  assert.ok(!settingsSection.includes('data-command="appSettings"'));
+  assert.ok(view.webview.html.indexOf('data-command="appSettings"') < view.webview.html.indexOf('<section class="device-settings"'));
+
   const controls=Object.keys(actions).map(command=>({dataset:{command},addEventListener:(_,fn)=>{controls.find(button=>button.dataset.command===command).click=fn;}})), fields=new Map(), posted=[];let render;
   vm.runInNewContext(fs.readFileSync(require.resolve('../media/app.js'),'utf8'),{acquireVsCodeApi:()=>({postMessage:m=>posted.push(m)}),document:{querySelectorAll:()=>controls,getElementById:id=>{if(!fields.has(id))fields.set(id,{});return fields.get(id);}},window:{addEventListener:(_,fn)=>{render=fn;}}});
   render({data:{type:'state',...state,busy:false}});assert.equal(fields.get('package').textContent,'com.demo');
