@@ -97,7 +97,8 @@ ${iconButton('record', '开始录屏（无声，最长 180 秒）', 'record', `$
       if (!uri || disposed) { recordingBusy = false; captureState(); return; }
       if (uri.scheme !== 'file') throw new Error('请选择本地保存路径');
       const session = startRecording(adb, serial, uri.fsPath); recording = session;
-      session.done.then(() => v.window.showInformationMessage(`录屏已保存：${uri.fsPath}`), error).finally(() => { if (recording === session) { recording = undefined; recordingBusy = false; captureState(); } });
+      // Notification promises wait for dismissal; release recording state before showing them.
+      session.done.finally(() => { if (recording === session) { recording = undefined; recordingBusy = false; captureState(); } }).then(() => v.window.showInformationMessage(`录屏已保存：${uri.fsPath}`), error);
       await session.ready.catch(() => {});
       recordingBusy = false; captureState();
     } catch(e) { recordingBusy = false; captureState(); throw e; }

@@ -32,13 +32,13 @@ function startRecording(adb, serial, destination) {
   if (recordings.has(serial)) throw new Error('该设备正在录屏，请先在原标签页停止');
   const remote = `/data/local/tmp/android-tools-${randomUUID()}.mp4`;
   const child = spawn(adb.binary(), ['-s', serial, 'shell', `echo $$; exec screenrecord --time-limit 180 ${quote(remote)}`], { windowsHide: true });
-  let pid, output = '', diagnostic = '', ended = false, stopping = false, resolveReady, rejectReady, finish;
+  let pid, output = '', diagnostic = '', ended = false, stopping = false, resolveReady, rejectReady, finish, stopTimer;
   const ready = new Promise((resolve, reject) => { resolveReady = resolve; rejectReady = reject; });
   ready.catch(() => {});
   const complete = new Promise((resolve, reject) => {
     finish = error => {
       if (ended) return; ended = true;
-      clearTimeout(startup); clearTimeout(watchdog);
+      clearTimeout(startup); clearTimeout(watchdog); clearTimeout(stopTimer);
       if (!pid) rejectReady(error || new Error('录屏启动失败'));
       error ? reject(error) : resolve();
     };
@@ -48,8 +48,9 @@ function startRecording(adb, serial, destination) {
     const target = await ready;
     if (ended || stopping) return;
     stopping = true;
+    stopTimer = setTimeout(() => { finish(new Error('停止录屏后 15 秒仍未收到进程结束通知，请检查设备连接')); child.kill(); }, 15000);
     try { await adb.shell(serial, ['kill', '-INT', target], { timeout: 10000 }); }
-    catch(e) { stopping = false; if (!ended) throw e; }
+    catch(e) { clearTimeout(stopTimer); stopping = false; if (!ended) throw e; }
   }};
   const startup = setTimeout(() => { finish(new Error('录屏启动超时')); child.kill(); }, 10000);
   const watchdog = setTimeout(() => { session.stop().catch(e => { finish(e); child.kill(); }); }, 190000);

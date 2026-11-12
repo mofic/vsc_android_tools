@@ -18,7 +18,7 @@ test('screenshot saves valid PNG safely and preserves existing destination on tr
   assert.equal((await fs.readFile(dest)).subarray(0,8).toString('hex'),'89504e470d0a1a0a');
 });
 test('recording stops only its own PID, prevents duplicate device sessions and saves MP4',async t=>{
-  const original=Module._load,children=[],calls=[];
+  const original=Module._load,originalTimeout=global.setTimeout,children=[],calls=[];
   const spawn=()=>{const child=new EventEmitter();child.stdout=new EventEmitter();child.stderr=new EventEmitter();child.kill=()=>child.emit('close',1);children.push(child);return child;};
   Module._load=function(id,...args){return id==='node:child_process'?{spawn}:original.call(this,id,...args)};
   delete require.cache[require.resolve('../src/capture')];
@@ -34,5 +34,12 @@ test('recording stops only its own PID, prevents duplicate device sessions and s
     assert.equal((await fs.readFile(path.join(dir,'video.mp4'))).subarray(4,8).toString(),'ftyp');
     const next=startRecording(adb,'device-a',path.join(dir,'next.mp4'));children[1].emit('error',Error('device disconnected'));
     await assert.rejects(next.done,/device disconnected/);
-  }finally{Module._load=original;}
+    let expireStop;
+    global.setTimeout=(fn,ms,...args)=>{if(ms===15000){expireStop=fn;return {};}return originalTimeout(fn,ms,...args);};
+    adb.shell=async()=>{};
+    const stalled=startRecording(adb,'device-a',path.join(dir,'stalled.mp4'));
+    children[2].stdout.emit('data',Buffer.from('5678\n'));await stalled.ready;await stalled.stop();
+    expireStop();await assert.rejects(stalled.done,/15 秒.*设备临时文件保留/);
+    global.setTimeout=originalTimeout;
+  }finally{Module._load=original;global.setTimeout=originalTimeout;}
 });
