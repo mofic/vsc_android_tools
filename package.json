@@ -1,0 +1,239 @@
+{
+  "name": "android-device-tools",
+  "displayName": "Android Device Tools",
+  "description": "Android 设备、文件、应用与彩色 Logcat 管理",
+  "version": "0.1.0",
+  "publisher": "local-android-tools",
+  "license": "MIT",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "main": "./src/extension.js",
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "capabilities": {
+    "untrustedWorkspaces": {
+      "supported": "limited",
+      "description": "构建和设备写入操作要求信任工作区"
+    }
+  },
+  "scripts": {
+    "test": "node --test test/*.test.js",
+    "check": "node --check src/core.js && node --check src/extension.js && node --check src/logcat.js && node --check media/logcat.js",
+    "package": "npx @vscode/vsce package --no-dependencies"
+  },
+  "contributes": {
+    "commands": [
+      {
+        "command": "androidTools.refresh",
+        "title": "刷新设备和文件",
+        "category": "Android Tools"
+      },
+      {
+        "command": "androidTools.selectDevice",
+        "title": "选择设备",
+        "category": "Android Tools"
+      },
+      {
+        "command": "androidTools.selectProject",
+        "title": "选择 Android 项目",
+        "category": "Android Tools"
+      },
+      {
+        "command": "androidTools.browse",
+        "title": "跳转设备目录",
+        "category": "Android Tools"
+      },
+      {
+        "command": "androidTools.open",
+        "title": "编辑设备文件",
+        "category": "Android Tools"
+      },
+      {
+        "command": "androidTools.save",
+        "title": "保存编辑到设备",
+        "category": "Android Tools"
+      },
+      {
+        "command": "androidTools.newFile",
+        "title": "新建文件",
+        "category": "Android Tools"
+      },
+      {
+        "command": "androidTools.newFolder",
+        "title": "新建文件夹",
+        "category": "Android Tools"
+      },
+      {
+        "command": "androidTools.rename",
+        "title": "重命名",
+        "category": "Android Tools"
+      },
+      {
+        "command": "androidTools.delete",
+        "title": "删除设备文件",
+        "category": "Android Tools"
+      },
+      {
+        "command": "androidTools.upload",
+        "title": "上传文件",
+        "category": "Android Tools"
+      },
+      {
+        "command": "androidTools.uploadFolder",
+        "title": "上传文件夹",
+        "category": "Android Tools"
+      },
+      {
+        "command": "androidTools.download",
+        "title": "下载",
+        "category": "Android Tools"
+      },
+      {
+        "command": "androidTools.build",
+        "title": "构建并安装启动",
+        "category": "Android Tools"
+      },
+      {
+        "command": "androidTools.install",
+        "title": "安装已有 APK",
+        "category": "Android Tools"
+      },
+      {
+        "command": "androidTools.launch",
+        "title": "启动应用",
+        "category": "Android Tools"
+      },
+      {
+        "command": "androidTools.stop",
+        "title": "停止应用",
+        "category": "Android Tools"
+      },
+      {
+        "command": "androidTools.uninstall",
+        "title": "卸载应用",
+        "category": "Android Tools"
+      },
+      {
+        "command": "androidTools.clearData",
+        "title": "清空应用数据",
+        "category": "Android Tools"
+      },
+      {
+        "command": "androidTools.revoke",
+        "title": "撤销运行时权限",
+        "category": "Android Tools"
+      },
+      {
+        "command": "androidTools.logcat",
+        "title": "打开 Logcat",
+        "category": "Android Tools"
+      }
+    ],
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "androidTools",
+          "title": "Android Tools",
+          "icon": "media/android.svg"
+        }
+      ]
+    },
+    "views": {
+      "androidTools": [
+        {
+          "id": "androidDevices",
+          "name": "设备"
+        },
+        {
+          "id": "androidFiles",
+          "name": "设备文件"
+        }
+      ]
+    },
+    "menus": {
+      "view/title": [
+        {
+          "command": "androidTools.refresh",
+          "when": "view == androidDevices || view == androidFiles",
+          "group": "navigation"
+        },
+        {
+          "command": "androidTools.selectDevice",
+          "when": "view == androidDevices || view == androidFiles",
+          "group": "navigation"
+        },
+        {
+          "command": "androidTools.selectProject",
+          "when": "view == androidDevices || view == androidFiles",
+          "group": "navigation"
+        },
+        {
+          "command": "androidTools.browse",
+          "when": "view == androidDevices || view == androidFiles",
+          "group": "navigation"
+        },
+        {
+          "command": "androidTools.logcat",
+          "when": "view == androidDevices || view == androidFiles",
+          "group": "navigation"
+        }
+      ],
+      "view/item/context": [
+        {
+          "command": "androidTools.open",
+          "when": "view == androidFiles"
+        },
+        {
+          "command": "androidTools.newFile",
+          "when": "view == androidFiles"
+        },
+        {
+          "command": "androidTools.newFolder",
+          "when": "view == androidFiles"
+        },
+        {
+          "command": "androidTools.rename",
+          "when": "view == androidFiles"
+        },
+        {
+          "command": "androidTools.delete",
+          "when": "view == androidFiles"
+        },
+        {
+          "command": "androidTools.upload",
+          "when": "view == androidFiles"
+        },
+        {
+          "command": "androidTools.uploadFolder",
+          "when": "view == androidFiles"
+        },
+        {
+          "command": "androidTools.download",
+          "when": "view == androidFiles"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "Android Tools",
+      "properties": {
+        "androidTools.adbPath": {
+          "type": "string",
+          "default": "adb",
+          "description": "ADB 可执行文件路径"
+        },
+        "androidTools.scanDepth": {
+          "type": "number",
+          "default": 4,
+          "minimum": 0,
+          "maximum": 12,
+          "description": "工作区项目发现深度"
+        }
+      }
+    }
+  }
+}
