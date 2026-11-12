@@ -97,12 +97,14 @@ function activate(ctx) {
     if (!value) return;
     c.packageName(value); await ctx.workspaceState.update(`package:${p}`, value); updateAppView(); return value;
   }
-  async function currentPackage() {
+  async function currentPackage(prompt = true) {
+    if (!project && !prompt) return;
     const p = await getProject(), remembered = ctx.workspaceState.get(`package:${p}`);
     if (remembered) return c.packageName(remembered);
     const packages = [...new Set((await c.artifacts(p)).map(a => a.packageName).filter(Boolean))];
     let value;
     if (packages.length === 1) value = packages[0];
+    else if (!prompt) return;
     else if (packages.length > 1) value = await v.window.showQuickPick(packages, { placeHolder: '选择当前项目的应用包名（记住本次选择）' });
     else value = await v.window.showInputBox({ prompt: '项目尚无 APK 元数据，请输入 applicationId（将记住）' });
     if (!value) return;

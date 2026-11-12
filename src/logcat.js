@@ -67,7 +67,7 @@ ${iconButton('findToggle', '搜索日志（Ctrl/Cmd+F）', 'search', 'aria-expan
   let sequence = source?.entries.length || 0, pausedAt = 0;
   let queryMatcher = compileQuery();
   let lines = source?.entries.map((entry,index) => ({ ...entry, id: index + 1 })) || [], filter = { level: 'V' }, pids, child, partial = '', paused = false, disposed = false, changed = true, packageId = '', checking = false;
-  let processNames = new Map();
+  let processNames = new Map(), defaultInitialized = false, filterTouched = false;
   const send = message => { if (!disposed) panel.webview.postMessage(message); };
   const sendHistory = () => send({ type: 'history', filters: ctx.globalState.get('logcat.recentFilters', []), favorites: ctx.globalState.get('logcat.favorites', []) });
   historyEvents.on('changed', sendHistory);
@@ -108,13 +108,27 @@ ${iconButton('findToggle', '搜索日志（Ctrl/Cmd+F）', 'search', 'aria-expan
         case 'ready':
           sendHistory();
           if (source) { send({ type: 'status', text: `已导入 ${source.name} · ${source.total} 行${source.total > lines.length ? `，显示最后 ${lines.length} 行` : ''} · 离线模式` }); send({ type: 'lines', lines: filtered() }); changed = false; }
-          else { await updateProcesses(); if (!disposed) start(); } break;
+          else {
+            if (!defaultInitialized) {
+              defaultInitialized = true;
+              try {
+                const value = await resolveMine(false);
+                if (value && !disposed && !filterTouched) {
+                  const f = normalizeLogFilter({level:'V',text:'',tag:'',regex:false,package:value});
+                  packageId = f.package; pids = new Set(); changed = true;
+                  send({type:'filterApplied',filter:f});
+                }
+              } catch(e) { error(e); }
+            }
+            await updateProcesses(); if (!disposed) start();
+          } break;
         case 'newTab': openLogcat(ctx, adb, serial, error, source, v.ViewColumn.Active, resolveMine); break;
         case 'split': openLogcat(ctx, adb, serial, error, source, v.ViewColumn.Beside, resolveMine); break;
         case 'import': await importLogcat(ctx, adb, error); break;
         case 'restart': await updateProcesses(); if (!disposed) start(); break;
         case 'filter':
         case 'useFilter': {
+          filterTouched = true;
           const saved = normalizeLogFilter(message.filter);
           let mine = [];
           if (compileQuery(saved.query).usesMine) { if (!serial) throw new Error('离线日志不支持 package:mine'); const value = await resolveMine(); if (!value) throw new Error('请先选择当前项目并确认 applicationId'); mine = [value]; }
