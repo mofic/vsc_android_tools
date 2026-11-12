@@ -31,6 +31,7 @@ async function importLogcat(ctx, adb, error) {
   return openLogcat(ctx, adb, undefined, error, source);
 }
 const icons = {
+  newTab: '<path d="M3 7h7l2-3h9v16H3Z"/><path d="M8 13h8m-4-4v8"/>',
   apply: '<path d="m4 12 5 5L20 6"/>', filters: '<path d="M4 7h16M4 17h16M9 4v6m6 4v6"/>',
   pause: '<path class="idle-icon" d="M8 5v14M16 5v14"/><path class="active-icon" d="m8 5 11 7-11 7Z"/>',
   clear: '<path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13M10 10v7m4-7v7"/>',
@@ -55,8 +56,9 @@ ${iconButton('pause', '暂停日志显示', 'pause', `${offline} aria-pressed="f
 ${iconButton('jumpEnd', '回到最新日志并跟随', 'down')}
 ${iconButton('clear', '清空当前视图', 'clear')}
 ${iconButton('findToggle', '搜索日志（Ctrl/Cmd+F）', 'search', 'aria-expanded="false" aria-controls="searchbar"')}
+${iconButton('newTab', '新建 Logcat 标签页', 'newTab')}
 <details id="more" class="popover"><summary title="更多操作" aria-label="更多操作">${icon('more')}</summary><div class="more-menu">
-<button id="newTab">新建标签页</button><button id="split">在旁边分屏</button><hr><button id="import">导入日志…</button><button id="export">导出日志…</button><button id="copy">复制日志</button><hr><button id="restart" ${offline}>重新连接</button><button id="deviceClear" ${offline}>清除设备日志…</button></div></details>
+<button id="split">在旁边分屏</button><hr><button id="import">导入日志…</button><button id="export">导出日志…</button><button id="copy">复制日志</button><hr><button id="restart" ${offline}>重新连接</button><button id="deviceClear" ${offline}>清除设备日志…</button></div></details>
 </header>
 <section class="log-content"><div id="searchbar" hidden role="search"><input id="findText" type="search" maxlength="300" placeholder="查找日志…" aria-label="日志内搜索"><span id="findCount" role="status" aria-live="polite">0/0</span>${iconButton('findPrev', '上一个（Shift+Enter）', 'up')}${iconButton('findNext', '下一个（Enter）', 'down')}${iconButton('findClose', '关闭搜索（Escape）', 'close')}</div>
 <main id="logs" tabindex="0" aria-label="Logcat 日志，实时行首显示当前 PID 对应包名或进程名"></main></section><footer><span id="packageStatus" title="当前生效的包名过滤">${source ? '离线日志 · 无设备包名映射' : '包名过滤：全部进程'}</span><span id="pauseStatus"></span><span id="status" role="status">连接中…</span></footer><script nonce="${nonce}" src="${script}"></script></body></html>`;
