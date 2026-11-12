@@ -8,6 +8,9 @@ exports.run = async () => {
   const commands = await v.commands.getCommands(true);
   for (const command of extension.packageJSON.contributes.commands) assert.ok(commands.includes(command.command), command.command);
   await v.commands.executeCommand('androidTools.refresh');
+  await v.commands.executeCommand('androidApp.focus');
+  await new Promise(resolve=>setTimeout(resolve,500));
+  console.log('PASS Extension Host: project app sidebar can be opened');
   if (process.env.ANDROID_TOOLS_TEST_DEVICE) {
     const serial = process.env.ANDROID_TOOLS_TEST_DEVICE;
     await v.commands.executeCommand('androidTools.open', { serial, remote: '/etc/hosts', target: '/system/etc/hosts', directory: false, symlink: true });

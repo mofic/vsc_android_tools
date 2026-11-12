@@ -16,7 +16,7 @@ test('activates every contributed command and tree, then disposes timers', async
   let inaccessible = false, onEdit, inputs=0; const opened=[], bars=[];
   const mock={
     workspace:{isTrusted:true,getConfiguration:()=>({get:(_,fallback)=>fallback}),onDidChangeTextDocument:fn=>{onEdit=fn;return disposable();},onDidSaveTextDocument:disposable,onDidChangeWorkspaceFolders:disposable},
-    window:{showInputBox:async()=>{inputs++;return undefined;},onDidChangeActiveTextEditor:disposable,showInformationMessage:()=>{},createTreeView:(id,options)=>{trees.set(id,options.treeDataProvider);return disposable();},createOutputChannel:()=>({...disposable(),append(){},appendLine(){}}),createStatusBarItem:()=>{const bar={...disposable(),show(){},hide(){}};bars.push(bar);return bar;},showErrorMessage:message=>errors.push(message),showTextDocument:async(uri,opts)=>opened.push({uri,opts}),withProgress:async(_,action)=>action({},{}),showWarningMessage:async()=> '确认',registerTreeDataProvider:(id,p)=>{trees.set(id,p);return disposable()}},
+    window:{registerWebviewViewProvider:()=>disposable(),showInputBox:async()=>{inputs++;return undefined;},onDidChangeActiveTextEditor:disposable,showInformationMessage:()=>{},createTreeView:(id,options)=>{trees.set(id,options.treeDataProvider);return disposable();},createOutputChannel:()=>({...disposable(),append(){},appendLine(){}}),createStatusBarItem:()=>{const bar={...disposable(),show(){},hide(){}};bars.push(bar);return bar;},showErrorMessage:message=>errors.push(message),showTextDocument:async(uri,opts)=>opened.push({uri,opts}),withProgress:async(_,action)=>action({},{}),showWarningMessage:async()=> '确认',registerTreeDataProvider:(id,p)=>{trees.set(id,p);return disposable()}},
     commands:{executeCommand:async (id,uri,opts)=>{calls.push(id);if(id==='vscode.open')opened.push({uri,opts});},registerCommand:(id,fn)=>{commands.set(id,fn);return disposable()}},
     Uri:{file:fsPath=>({fsPath})},ProgressLocation:{Notification:1},StatusBarAlignment:{Left:1},EventEmitter:class{event=()=>{};fire(){}dispose(){}},
     TreeItem:class{constructor(label){this.label=label}},ThemeIcon:class{constructor(id){this.id=id}},TreeItemCollapsibleState:{Collapsed:1,None:0}
@@ -43,6 +43,12 @@ test('activates every contributed command and tree, then disposes timers', async
     await commands.get('androidTools.openAppDirectory')();
     assert.equal(state.get(`package:${project}`), 'com.example.debug');
     assert.ok(calls.includes('androidFiles.focus'));
+    const savedWarning=mock.window.showWarningMessage;mock.window.showWarningMessage=async()=>undefined;
+    const beforeCancel=calls.length;await commands.get('androidTools.clearData')();assert.equal(calls.length,beforeCancel);
+    mock.window.showWarningMessage=savedWarning;await commands.get('androidTools.clearData')();
+    assert.ok(calls.some(call=>call.serial==='serial'&&call.args?.[1]==="'pm' 'clear' 'com.example.debug'"));
+    await commands.get('androidTools.installProject')();assert.ok(calls.some(call=>call.serial==='serial'&&call.args?.[0]==='install'&&call.args[2]===path.join(project,'app.apk')));
+
     const listCount = () => calls.filter(call=>call.args?.[0]==='shell').length;
     const beforeListing = listCount();
     const [children] = await Promise.all([trees.get('androidFiles').getChildren(), trees.get('androidFiles').getChildren()]);

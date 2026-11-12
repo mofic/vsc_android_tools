@@ -4,12 +4,14 @@ const fs = require('node:fs/promises');
 const os = require('node:os');
 const path = require('node:path');
 const c = require('./core');
+const { registerAppView } = require('./app-view');
 const { openLogcat, importLogcat } = require('./logcat');
 function activate(ctx) {
   const adb = new c.Adb(() => v.workspace.getConfiguration('androidTools').get('adbPath', 'adb'));
   const output = v.window.createOutputChannel('Android Tools');
   let selected, deviceList = [], root = '/sdcard', project = ctx.workspaceState.get('project');
   const edited = new Map(), opening = new Map();
+  let updateAppView = () => {};
   let filesView; const back = [], forward = [];
   const deviceEvent = new v.EventEmitter(), fileEvent = new v.EventEmitter();
   const status = v.window.createStatusBarItem(v.StatusBarAlignment.Left);
@@ -18,6 +20,7 @@ function activate(ctx) {
   const trust = () => { if (!v.workspace.isTrusted) throw new Error('请先信任工作区再执行写入或构建操作'); };
   const directoryCache = new Map();
   function updateFileHeader() {
+    updateAppView();
     if (filesView) { filesView.description = selected || ''; filesView.message = selected ? root : '请选择已授权设备'; }
   }
   function refreshFiles(item) {
@@ -73,21 +76,22 @@ function activate(ctx) {
     if (!pick) return;
     project = pick.value || (await v.window.showOpenDialog({ canSelectFolders: true, canSelectFiles: false, canSelectMany: false }))?.[0]?.fsPath;
     if (project) { await ctx.workspaceState.update('project', project); v.window.showInformationMessage(`Android 项目：${project}`); }
-    return project;
+    updateAppView(); return project;
   }
   async function getProject() { if (!project) await chooseProject(); if (!project) throw new Error('未选择项目'); await fs.access(project); return project; }
-  async function artifact() {
-    const p = await getProject();
+  async function artifact(projectRoot) {
+    const p = projectRoot || await getProject();
     const choices = await c.artifacts(p);
     if (!choices.length) return undefined;
-    const picked = await v.window.showQuickPick(choices.map(a => ({ label: `${a.variant || 'APK'} · ${a.packageName || ''}`, description: path.relative(p, a.apk), value: a })), { placeHolder: '选择 APK / 构建变体' });
+    const picked = choices.length === 1 ? { value: choices[0] } : await v.window.showQuickPick(choices.map(a => ({ label: `${a.variant || 'APK'} · ${a.packageName || ''}`, description: path.relative(p, a.apk), value: a })), { placeHolder: '选择 APK / 构建变体' });
     return picked?.value;
   }
-  async function pkg() {
-    const a = await artifact();
-    const value = await v.window.showInputBox({ title: `目标设备 ${selected}`, prompt: '确认 applicationId（优先来自 APK 元数据）', value: a?.packageName || ctx.workspaceState.get(`package:${project}`, '') });
+  async function pkg(force = false) {
+    if (!force) return currentPackage();
+    const p = await getProject(), a = await artifact(p);
+    const value = await v.window.showInputBox({ title: `目标设备 ${selected}`, prompt: '确认 applicationId（优先来自 APK 元数据）', value: a?.packageName || ctx.workspaceState.get(`package:${p}`, '') });
     if (!value) return;
-    c.packageName(value); await ctx.workspaceState.update(`package:${project}`, value); return value;
+    c.packageName(value); await ctx.workspaceState.update(`package:${p}`, value); updateAppView(); return value;
   }
   async function currentPackage() {
     const p = await getProject(), remembered = ctx.workspaceState.get(`package:${p}`);
@@ -98,7 +102,7 @@ function activate(ctx) {
     else if (packages.length > 1) value = await v.window.showQuickPick(packages, { placeHolder: '选择当前项目的应用包名（记住本次选择）' });
     else value = await v.window.showInputBox({ prompt: '项目尚无 APK 元数据，请输入 applicationId（将记住）' });
     if (!value) return;
-    c.packageName(value); await ctx.workspaceState.update(`package:${p}`, value); return value;
+    c.packageName(value); await ctx.workspaceState.update(`package:${p}`, value); updateAppView(); return value;
   }
   async function confirm(message) { return await v.window.showWarningMessage(message, { modal: true }, '确认') === '确认'; }
   async function progress(title, action) { return v.window.withProgress({ location: v.ProgressLocation.Notification, title, cancellable: true }, (progress, token) => action({ token, timeout: 1800000, onOutput: s => { output.append(s); const line = s.trim().split(/\r?\n/).pop(); if (line) progress.report?.({ message: line.slice(-160) }); } })); }
@@ -137,6 +141,14 @@ function activate(ctx) {
   }};
   const handlers = {
     refresh, selectDevice: chooseDevice, selectProject: chooseProject,
+    selectPackage: async () => pkg(true),
+    installProject: async () => {
+      trust(); const serial = await device(), p = await getProject(), a = await artifact(p); if (!a) throw new Error('未找到项目 APK，请先构建，或选择安装其他 APK');
+      if (a.filters.length) throw new Error('请选择通用 APK，拆分包请通过安装其他 APK 多选完整包集');
+      c.packageName(a.packageName);
+      await progress(`安装项目 APK 到 ${serial}`, opts => adb.exec(serial, ['install', '-r', a.apk], opts));
+      await ctx.workspaceState.update(`package:${p}`, c.packageName(a.packageName)); updateAppView(); v.window.showInformationMessage(`已安装 ${a.packageName} 到 ${serial}`);
+    },
     goParent: async () => navigate(path.posix.dirname(root)),
     goBack: async () => { if (back.length) { const next = back.pop(); forward.push(root); await navigate(next, false); } },
     goForward: async () => { if (forward.length) { const next = forward.pop(); back.push(root); await navigate(next, false); } },
@@ -204,8 +216,9 @@ function activate(ctx) {
       const task = pick === '手动输入任务…' ? await v.window.showInputBox({ value: ':app:assembleDebug', prompt: 'Gradle 构建任务' }) : pick; if (!task) return;
       if (!/^:?[A-Za-z0-9_:]+$/.test(task)) throw new Error('无效 Gradle 任务');
       await progress(`构建 ${p}`, opts => gradle([task, '--console=plain'], opts));
-      const a = await artifact(); if (!a) return;
+      const a = await artifact(p); if (!a) return;
       if (a.filters.length) throw new Error('此 APK 含拆分过滤条件，请使用通用 APK 或手动安装完整 APK 集');
+      c.packageName(a.packageName);
       await progress(`安装 ${serial}`, opts => adb.exec(serial, ['install', '-r', a.apk], opts));
       await ctx.workspaceState.update(`package:${p}`, c.packageName(a.packageName));
       await launch(serial, a.packageName);
@@ -223,7 +236,7 @@ function activate(ctx) {
   for (const [id, command] of Object.entries({ stop: ['am', 'force-stop'], uninstall: ['pm', 'uninstall'], clearData: ['pm', 'clear'], revoke: ['pm', 'reset-permissions'] })) {
     handlers[id] = async () => {
       trust(); const serial = await device(), packageId = await pkg(); if (!packageId) return;
-      if (['uninstall','clearData','revoke'].includes(id) && !await confirm(`${id}：${serial} / ${project || ''} / ${packageId}？`)) return;
+      if (['uninstall','clearData','revoke'].includes(id) && !await confirm(`${{uninstall:'卸载应用',clearData:'清空应用数据',revoke:'撤销运行时权限'}[id]}：${serial} / ${project || ''} / ${packageId}？`)) return;
       if (id === 'revoke') {
         // reset-permissions 作用于全设备，因此逐项撤销目标包的已授予运行时权限。
         const dump = await adb.shell(serial, ['dumpsys', 'package', packageId]);
@@ -250,8 +263,9 @@ function activate(ctx) {
     if (!await confirm(`上传至 ${t.serial}:${dir}，合并目录并覆盖同名文件？`)) return;
     await progress('上传到设备', async opts => { for (const source of sources) await adb.exec(t.serial, ['push', source.fsPath, dir + '/'], opts); }); if (t.directory) refreshFiles(t); else refreshParent(t); v.window.showInformationMessage(`上传完成：${t.serial}:${dir}`);
   };
-  for (const [id, handler] of Object.entries(handlers)) ctx.subscriptions.push(v.commands.registerCommand(`androidTools.${id}`, (...args) => Promise.resolve().then(() => handler(...args)).catch(error)));
+  for (const [id, handler] of Object.entries(handlers)) ctx.subscriptions.push(v.commands.registerCommand(`androidTools.${id}`, (...args) => Promise.resolve().then(() => handler(...args)).catch(e => { error(e); }).finally(() => updateAppView())));
   ctx.subscriptions.push(v.window.registerTreeDataProvider('androidDevices', devicesProvider), filesView = v.window.createTreeView('androidFiles', { treeDataProvider: filesProvider, showCollapseAll: true }), output, status, deviceEvent, fileEvent);
+  updateAppView = registerAppView(ctx, () => ({ project: project || '', device: selected || '', packageName: project ? ctx.workspaceState.get(`package:${project}`, '') : '' }), id => v.commands.executeCommand(`androidTools.${id}`));
   updateFileHeader();
   const editStatus = v.window.createStatusBarItem(v.StatusBarAlignment.Right);
   editStatus.command = 'androidTools.save';
@@ -268,7 +282,7 @@ function activate(ctx) {
   let refreshing = false;
   const poll = setInterval(async () => { if (refreshing) return; refreshing = true; try { await refreshDevices(); } catch { /* manual refresh shows ADB setup errors */ } finally { refreshing = false; } }, 5000);
   ctx.subscriptions.push({ dispose() { clearInterval(poll); for (const t of edited.values()) fs.rm(t.temp, { recursive: true, force: true }).catch(() => {}); } });
-  ctx.subscriptions.push(v.workspace.onDidChangeWorkspaceFolders(() => { project = undefined; ctx.workspaceState.update('project', undefined); }));
+  ctx.subscriptions.push(v.workspace.onDidChangeWorkspaceFolders(() => { project = undefined; ctx.workspaceState.update('project', undefined); updateAppView(); }));
   refresh().catch(error);
 }
 module.exports = { activate };

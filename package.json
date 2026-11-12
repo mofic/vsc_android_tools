@@ -2,7 +2,7 @@
   "name": "android-device-tools",
   "displayName": "Android Device Tools",
   "description": "Android 设备、文件、应用与彩色 Logcat 管理",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "publisher": "local-android-tools",
   "license": "MIT",
   "engines": {
@@ -23,7 +23,7 @@
   },
   "scripts": {
     "test": "node --test test/*.test.js",
-    "check": "node --check src/core.js && node --check src/extension.js && node --check src/logcat.js && node --check media/logcat.js && node --check src/capture.js && node --check src/log-query.js",
+    "check": "node --check src/core.js && node --check src/extension.js && node --check src/logcat.js && node --check media/logcat.js && node --check src/capture.js && node --check src/log-query.js && node --check src/app-view.js && node --check media/app.js",
     "package": "npx @vscode/vsce package --no-dependencies"
   },
   "contributes": {
@@ -191,6 +191,18 @@
         "title": "刷新所选目录",
         "category": "Android Tools",
         "icon": "$(refresh)"
+      },
+      {
+        "command": "androidTools.selectPackage",
+        "title": "确认／切换项目包名",
+        "category": "Android Tools",
+        "icon": "$(symbol-package)"
+      },
+      {
+        "command": "androidTools.installProject",
+        "title": "安装当前项目 APK",
+        "category": "Android Tools",
+        "icon": "$(package)"
       }
     ],
     "viewsContainers": {
@@ -207,6 +219,11 @@
         {
           "id": "androidDevices",
           "name": "设备"
+        },
+        {
+          "id": "androidApp",
+          "name": "项目应用",
+          "type": "webview"
         },
         {
           "id": "androidFiles",

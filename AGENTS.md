@@ -7,6 +7,7 @@
 这是通过 ADB 管理 Android 设备的 VS Code 桌面扩展。使用 JavaScript CommonJS、Node.js 标准库与 VS Code API，没有运行时 npm 依赖，也没有 TypeScript 编译步骤。
 
 - `package.json`：扩展入口、命令、图标、菜单、设置和版本。
+- `src/app-view.js`、`media/app.js`、`media/app.css`：项目应用侧栏，显示目标并通过白名单复用命令。
 - `src/extension.js`：设备/文件树、目录缓存、原生 Gradle 项目与应用操作、命令注册。
 - `src/core.js`：ADB 调用、路径校验、目录元数据、项目发现、APK 元数据、日志解析和过滤。
 - `src/log-query.js`：Studio 风格查询解析和匹配，不执行用户输入代码。
