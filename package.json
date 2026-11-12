@@ -2,7 +2,7 @@
   "name": "android-device-tools",
   "displayName": "Android Device Tools",
   "description": "Android 设备、文件、应用与彩色 Logcat 管理",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "publisher": "local-android-tools",
   "license": "MIT",
   "engines": {
@@ -31,22 +31,26 @@
       {
         "command": "androidTools.refresh",
         "title": "刷新设备和文件",
-        "category": "Android Tools"
+        "category": "Android Tools",
+        "icon": "$(refresh)"
       },
       {
         "command": "androidTools.selectDevice",
         "title": "选择设备",
-        "category": "Android Tools"
+        "category": "Android Tools",
+        "icon": "$(device-mobile)"
       },
       {
         "command": "androidTools.selectProject",
         "title": "选择 Android 项目",
-        "category": "Android Tools"
+        "category": "Android Tools",
+        "icon": "$(folder-opened)"
       },
       {
         "command": "androidTools.browse",
         "title": "跳转设备目录",
-        "category": "Android Tools"
+        "category": "Android Tools",
+        "icon": "$(go-to-file)"
       },
       {
         "command": "androidTools.open",
@@ -131,7 +135,8 @@
       {
         "command": "androidTools.logcat",
         "title": "打开 Logcat",
-        "category": "Android Tools"
+        "category": "Android Tools",
+        "icon": "$(output)"
       }
     ],
     "viewsContainers": {
