@@ -107,3 +107,11 @@
 
 - 时间设置、语言设置、开发者选项移至独立“设备设置”区域，使用主题分隔线、标题和留白与应用操作区分。应用设置保留在应用操作区域。
 - npm test 26 项及 npm run check 通过，现有面板测试补充三个设备按钮与应用设置的分组断言。未做真实窗口视觉验证；操作逻辑未变。
+
+## 0.2.7 自动识别项目运行目标（2026-11-12）
+
+- 使用 Gradle 临时 init script 和 Android Components 的 application 变体模型识别目标，替代全部 assemble 任务列表。默认 Debug；单目标自动运行，多应用或渠道选择后按项目记住；目标消失时重新识别。
+- 编译后仅扫描目标 buildDirectory/outputs/apk，按目标模块目录及变体匹配唯一通用 APK，避免再次选到其他模块、Release 或旧变体产物。无对应通用产物时提示错误。
+- 真实 MQB 多模块项目 Gradle 配置查询成功，只返回 app 的 debug/release；默认唯一 debug 为 :app:assembleDebug。未执行该项目编译安装，也未变更设备应用数据。
+- npm test 29 项和 npm run check 通过。覆盖单应用无选择框直接编译、安装和启动，默认/记忆/失效目标，模型校验和 APK 模块/变体隔离。AGP 7.0 以下旧项目未覆盖。
+- 复核补充：模型查询显式关闭 configuration on demand；真实 MQB 项目通过 -Dorg.gradle.configureondemand=true 回归，仍识别 app Debug/Release，避免按需配置跳过应用子模块。

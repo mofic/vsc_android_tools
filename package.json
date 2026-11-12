@@ -2,7 +2,7 @@
   "name": "android-device-tools",
   "displayName": "Android Device Tools",
   "description": "Android 设备、文件、应用与彩色 Logcat 管理",
-  "version": "0.2.6",
+  "version": "0.2.7",
   "publisher": "local-android-tools",
   "license": "MIT",
   "engines": {
@@ -23,7 +23,7 @@
   },
   "scripts": {
     "test": "node --test test/*.test.js",
-    "check": "node --check src/remote-path.js && node --check src/root-files.js && node --check src/core.js && node --check src/extension.js && node --check src/logcat.js && node --check media/logcat.js && node --check src/capture.js && node --check src/log-query.js && node --check src/app-view.js && node --check media/app.js",
+    "check": "node --check src/remote-path.js && node --check src/root-files.js && node --check src/run-targets.js && node --check src/core.js && node --check src/extension.js && node --check src/logcat.js && node --check media/logcat.js && node --check src/capture.js && node --check src/log-query.js && node --check src/app-view.js && node --check media/app.js",
     "package": "npx @vscode/vsce package --no-dependencies"
   },
   "contributes": {

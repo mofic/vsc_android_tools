@@ -11,7 +11,7 @@ test('activates every contributed command and tree, then disposes timers', async
   const commands=new Map(), trees=new Map(), subscriptions=[];
   const disposable=()=>({dispose(){}});
   const project = await fs.mkdtemp(path.join(os.tmpdir(), 'android-project-'));
-  await fs.writeFile(path.join(project, 'output-metadata.json'), JSON.stringify({ applicationId: 'com.example.debug', elements: [{ outputFile: 'app.apk' }] }));
+  await fs.writeFile(path.join(project, 'output-metadata.json'), JSON.stringify({ applicationId: 'com.example.debug', variantName:'debug', elements: [{ outputFile: 'app.apk' }] }));
   const state=new Map([['project', project]]), calls=[], errors=[];
   let inaccessible = false, onEdit, inputs=0; const opened=[], bars=[];
   const mock={
@@ -128,10 +128,10 @@ test('activates every contributed command and tree, then disposes timers', async
     const core=require('../src/core'), previousRun=core.run, previousExec=Adb.prototype.exec;
     const sequence=[];
     await fs.writeFile(path.join(project,'gradlew'),'');
-    mock.window.showQuickPick=async()=>':app:assembleDebug';
+    mock.window.showQuickPick=async()=>{throw new Error('Single app must run without prompts');};
     let clearFails=false, buildFails=false;
     core.run=async(_,args)=>{
-      if(args.includes('tasks'))return ':app:assembleDebug - Assemble debug';
+      if(args.includes('help')){assert.ok(args.includes('--no-configure-on-demand'));return 'ANDROID_TOOLS_TARGETS='+JSON.stringify([{task:':app:assembleDebug',variant:'debug',buildType:'debug',outputDir:project}]);}
       sequence.push('compile');if(buildFails)throw new Error('build failed');return '';
     };
     Adb.prototype.exec=async(serial,args)=>{

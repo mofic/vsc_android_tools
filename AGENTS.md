@@ -11,6 +11,7 @@
 - `src/extension.js`：设备/文件树、目录缓存、原生 Gradle 项目与应用操作、命令注册。
 - `src/core.js`：ADB 调用、路径校验、目录元数据、项目发现、APK 元数据、日志解析和过滤。
 - `src/root-files.js`：Root 私有文件传输及权限保留；`src/remote-path.js`：路径和 shell 参数校验。
+- `src/run-targets.js`：通过 Gradle 应用变体模型识别运行目标，限定模块和变体的 APK。
 - `src/log-query.js`：Studio 风格查询解析和匹配，不执行用户输入代码。
 - `src/logcat.js`：Logcat Webview 生命周期、实时/离线日志、过滤历史及采集操作。
 - `src/capture.js`：截屏、录屏进程与安全保存。

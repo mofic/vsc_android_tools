@@ -4,6 +4,7 @@ const fs = require('node:fs/promises');
 const os = require('node:os');
 const path = require('node:path');
 const c = require('./core');
+const runTargets = require('./run-targets');
 const { registerAppView } = require('./app-view');
 const { openLogcat, importLogcat } = require('./logcat');
 function activate(ctx) {
@@ -218,14 +219,23 @@ function activate(ctx) {
     trust(); const serial = await device(), p = await getProject();
     const wrapper = path.join(p, process.platform === 'win32' ? 'gradlew.bat' : 'gradlew'); await fs.access(wrapper);
     const gradle = (taskArgs, opts) => process.platform === 'win32' ? c.run('cmd.exe', ['/d', '/c', 'gradlew.bat', ...taskArgs], { ...opts, cwd: p }) : c.run('/bin/sh', [wrapper, ...taskArgs], { ...opts, cwd: p });
-    const listing = await progress('识别模块和构建变体', opts => gradle(['tasks', '--all', '--console=plain'], opts));
-    const tasks = [...new Set([...listing.matchAll(/^([\w:]*assemble[\w]*)\s+-/gm)].map(m => m[1]))];
-    const pick = await v.window.showQuickPick([...tasks, '手动输入任务…'], { placeHolder: '选择应用模块与构建变体' });
-    if (!pick) return;
-    const task = pick === '手动输入任务…' ? await v.window.showInputBox({ value: ':app:assembleDebug', prompt: 'Gradle 构建任务' }) : pick; if (!task) return;
-    if (!/^:?[A-Za-z0-9_:]+$/.test(task)) throw new Error('无效 Gradle 任务');
-    await progress(`构建 ${p}`, opts => gradle([task, '--console=plain'], opts));
-    const a = await artifact(p); if (!a) return;
+    const temp = await fs.mkdtemp(path.join(os.tmpdir(), 'android-run-targets-'));
+    let targets;
+    try {
+      const init = path.join(temp, 'targets.gradle'); await fs.writeFile(init, runTargets.initScript);
+      const listing = await progress('识别应用模块', opts => gradle(['help', '--init-script', init, '--no-configuration-cache', '--no-configure-on-demand', '--console=plain', '-q'], opts));
+      targets = runTargets.parseTargets(listing);
+    } finally { await fs.rm(temp, { recursive: true, force: true }); }
+    const choices = runTargets.preferredTargets(targets, ctx.workspaceState.get(`runTask:${p}`));
+    if (!choices.length) throw new Error('未找到可运行的 Android 应用变体');
+    const target = choices.length === 1 ? choices[0] : (await v.window.showQuickPick(choices.map(t => ({ label: t.task.split(':').slice(0,-1).join(':') || ':', description: t.variant, target:t })), { placeHolder: '选择要运行的应用／渠道（将记住选择）' }))?.target;
+    if (!target) return;
+    await ctx.workspaceState.update(`runTask:${p}`, target.task);
+    await progress(`构建 ${target.task}`, opts => gradle([target.task, '--console=plain'], opts));
+    const artifacts = runTargets.targetArtifacts(await c.artifacts(target.outputDir), target);
+    const universal = artifacts.filter(a => !a.filters.length);
+    if (universal.length !== 1) throw new Error('未找到当前运行变体的唯一通用 APK，请检查构建产物或拆分 APK 配置');
+    const a = universal[0];
     if (a.filters.length) throw new Error('此 APK 含拆分过滤条件，请使用通用 APK 或手动安装完整 APK 集');
     c.packageName(a.packageName);
     if (clearData && !await confirm(`清除数据并运行：${serial} / ${p} / ${a.packageName}？应用数据将被永久删除。`)) return;
