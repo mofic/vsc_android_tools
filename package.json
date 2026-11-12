@@ -2,7 +2,7 @@
   "name": "android-device-tools",
   "displayName": "Android Device Tools",
   "description": "Android 设备、文件、应用与彩色 Logcat 管理",
-  "version": "0.1.10",
+  "version": "0.1.11",
   "publisher": "local-android-tools",
   "license": "MIT",
   "engines": {

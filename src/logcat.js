@@ -30,13 +30,43 @@ async function importLogcat(ctx, adb, error) {
   const source = { name: path.basename(uri.fsPath), ...importLogs(Buffer.from(bytes).toString('utf8')) };
   return openLogcat(ctx, adb, undefined, error, source);
 }
+const icons = {
+  apply: '<path d="m4 12 5 5L20 6"/>', filters: '<path d="M4 7h16M4 17h16M9 4v6m6 4v6"/>',
+  pause: '<path class="idle-icon" d="M8 5v14M16 5v14"/><path class="active-icon" d="m8 5 11 7-11 7Z"/>',
+  clear: '<path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13M10 10v7m4-7v7"/>',
+  search: '<circle cx="10" cy="10" r="6"/><path d="m15 15 5 5"/>',
+  screenshot: '<path d="M3 7h4l2-3h6l2 3h4v13H3Z"/><circle cx="12" cy="13" r="4"/>',
+  record: '<circle class="idle-icon" cx="12" cy="12" r="7"/><rect class="active-icon" x="6" y="6" width="12" height="12"/>',
+  more: '<circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/>',
+  up: '<path d="m6 14 6-6 6 6"/>', down: '<path d="m6 10 6 6 6-6"/>', close: '<path d="m6 6 12 12M6 18 18 6"/>'
+};
+const icon = name => `<svg viewBox="0 0 24 24" aria-hidden="true">${icons[name]}</svg>`;
+const iconButton = (id, title, name, attributes = '') => `<button class="icon-button" id="${id}" title="${title}" aria-label="${title}" ${attributes}>${icon(name)}</button>`;
 function openLogcat(ctx, adb, serial, error, source, column = v.ViewColumn.Active) {
   const panel = v.window.createWebviewPanel('androidLogcat', `Logcat #${nextSession++} · ${source ? source.name : serial}`, column, { enableScripts: true, retainContextWhenHidden: true, localResourceRoots: [v.Uri.joinPath(ctx.extensionUri, 'media')] });
   const nonce = randomBytes(16).toString('hex');
   const script = panel.webview.asWebviewUri(v.Uri.joinPath(ctx.extensionUri, 'media', 'logcat.js'));
   const style = panel.webview.asWebviewUri(v.Uri.joinPath(ctx.extensionUri, 'media', 'logcat.css'));
   const offline = source ? 'disabled' : '';
-  panel.webview.html = `<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${panel.webview.cspSource}; script-src 'nonce-${nonce}'"><link rel="stylesheet" href="${style}"></head><body><header><button id="newTab" title="为当前设备或日志新建独立标签页">新建标签页</button><button id="split" title="在旁边打开独立 Logcat">分屏</button><label>最近过滤 <select id="history" aria-label="最近使用的过滤配置"><option value="">选择最近配置…</option></select></label><label>级别 <select id="level"><option>V</option><option>D</option><option>I</option><option>W</option><option>E</option><option>F</option></select></label><label>关键词 <input id="text" placeholder="过滤内容"></label><label><input id="regex" type="checkbox">正则</label><label>Tag <input id="tag"></label><label>包名 <input id="package" ${offline} title="包名过滤需要实时设备进程信息" placeholder="留空显示全部进程"></label><button id="apply">应用过滤</button><button id="pause" ${offline}>暂停</button><label><input id="scroll" type="checkbox" checked>自动滚动</label><button id="clear">清空视图</button><button id="deviceClear" ${offline}>清除设备日志</button><button id="copy">复制</button><button id="import">导入</button><button id="export">导出</button><button id="restart" ${offline}>重连</button><button id="screenshot" ${offline}>设备截屏</button><button id="record" ${offline} title="无声 MP4，最长 180 秒">开始录屏</button></header><div id="searchbar" role="search"><label>日志内搜索 <input id="findText" type="search" maxlength="300" placeholder="搜索当前日志（不隐藏其他行）" aria-label="日志内搜索"></label><button id="findPrev" title="上一个（Shift+Enter）" aria-label="上一个匹配">↑</button><button id="findNext" title="下一个（Enter）" aria-label="下一个匹配">↓</button><span id="findCount" role="status" aria-live="polite">0/0</span></div><p id="status" role="status">连接中…</p><main id="logs" tabindex="0" aria-label="Logcat 日志"></main><script nonce="${nonce}" src="${script}"></script></body></html>`;
+  panel.webview.html = `<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${panel.webview.cspSource}; script-src 'nonce-${nonce}'"><link rel="stylesheet" href="${style}"></head><body><header class="toolbar" aria-label="Logcat 工具栏">
+<select id="level" aria-label="最低日志级别" title="最低日志级别"><option>V</option><option>D</option><option>I</option><option>W</option><option>E</option><option>F</option></select>
+<div class="keyword"><input id="text" placeholder="过滤日志…" aria-label="过滤关键词"><label class="regex-toggle" title="使用正则表达式"><input id="regex" type="checkbox"><span>.*</span></label></div>
+${iconButton('apply', '应用过滤（Enter）', 'apply')}
+<details id="filterOptions" class="popover"><summary id="filterOptionsToggle" title="更多过滤条件" aria-label="更多过滤条件">${icon('filters')}</summary><div class="filter-options">
+<label>最近配置<select id="history" aria-label="最近使用的过滤配置"><option value="">选择最近配置…</option></select></label>
+<label>Tag<input id="tag" placeholder="按 Tag 过滤"></label><label>包名<input id="package" ${offline} title="包名过滤需要实时设备进程信息" placeholder="留空显示全部进程"></label><small>设置后按 Enter 或点击主栏的应用按钮</small></div></details>
+<span class="separator" aria-hidden="true"></span>
+${iconButton('pause', '暂停日志显示', 'pause', `${offline} aria-pressed="false"`)}
+<label class="scroll-toggle" title="自动滚动到最新日志"><input id="scroll" type="checkbox" checked>跟随</label>
+${iconButton('clear', '清空当前视图', 'clear')}
+${iconButton('findToggle', '搜索日志（Ctrl/Cmd+F）', 'search', 'aria-expanded="false" aria-controls="searchbar"')}
+${iconButton('screenshot', '设备截屏', 'screenshot', offline)}
+${iconButton('record', '开始录屏（无声，最长 180 秒）', 'record', `${offline} aria-pressed="false"`)}
+<details id="more" class="popover"><summary title="更多操作" aria-label="更多操作">${icon('more')}</summary><div class="more-menu">
+<button id="newTab">新建标签页</button><button id="split">在旁边分屏</button><hr><button id="import">导入日志…</button><button id="export">导出日志…</button><button id="copy">复制日志</button><hr><button id="restart" ${offline}>重新连接</button><button id="deviceClear" ${offline}>清除设备日志…</button></div></details>
+</header>
+<section class="log-content"><div id="searchbar" hidden role="search"><input id="findText" type="search" maxlength="300" placeholder="查找日志…" aria-label="日志内搜索"><span id="findCount" role="status" aria-live="polite">0/0</span>${iconButton('findPrev', '上一个（Shift+Enter）', 'up')}${iconButton('findNext', '下一个（Enter）', 'down')}${iconButton('findClose', '关闭搜索（Escape）', 'close')}</div>
+<main id="logs" tabindex="0" aria-label="Logcat 日志"></main></section><footer><span id="status" role="status">连接中…</span></footer><script nonce="${nonce}" src="${script}"></script></body></html>`;
   let lines = source?.entries.slice() || [], filter = { level: 'V' }, pids, child, partial = '', paused = false, disposed = false, changed = true, packageId = '', checking = false;
   let recording, screenshotBusy = false, recordingBusy = false;
   const send = message => { if (!disposed) panel.webview.postMessage(message); };

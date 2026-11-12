@@ -21,6 +21,7 @@ test('offline import renders, filters, exports without ADB; cancel and size erro
     const {importLogcat}=require('../src/logcat');
     const state=new Map(), globalState={get:(key,fallback)=>state.get(key) || fallback,update:async(key,value)=>state.set(key,value)};
     const panel=await importLogcat({subscriptions,extensionUri:'test',globalState},adb,e=>errors.push(e));
+    assert.match(panel.webview.html,/id="searchbar" hidden/);assert.match(panel.webview.html,/<details id="more"/);
     assert.match(panel.webview.html,/id="import"/); assert.match(panel.webview.html,/id="package" disabled/);
     await onMessage({type:'ready'});
     assert.equal(messages.find(m=>m.type==='lines').lines.length,2);

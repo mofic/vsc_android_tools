@@ -19,6 +19,8 @@ test('log search highlights literal case-insensitive matches, wraps navigation a
   const byId=id=>{if(!elements.has(id))elements.set(id,new Element());return elements.get(id);};
   const context={acquireVsCodeApi:()=>({postMessage:m=>sent.push(m)}),document:{getElementById:byId,createElement:tag=>new Element(tag),createDocumentFragment:()=>new Element('fragment'),createTextNode:text=>({textContent:text})},window:{addEventListener:(type,fn)=>{listeners[type]=fn;}}};
   vm.runInNewContext(fs.readFileSync(require.resolve('../media/logcat.js'),'utf8'),context);
+  byId('searchbar').hidden=true;
+  byId('findToggle').listeners.click();assert.equal(byId('searchbar').hidden,false);
   const rows=[{line:'A.b <script> a.b',level:'E'},{line:'other line',level:'I'}];
   listeners.message({data:{type:'lines',lines:rows}});
   byId('scroll').checked=true;byId('findText').value='a.b';byId('findText').listeners.input();
@@ -30,7 +32,8 @@ test('log search highlights literal case-insensitive matches, wraps navigation a
   listeners.message({data:{type:'lines',lines:[...rows,{line:'new a.b',level:'D'}]}});assert.equal(byId('findCount').textContent,'2/3');
   const key={key:'Enter',shiftKey:true,preventDefault(){}};byId('findText').listeners.keydown(key);assert.equal(byId('findCount').textContent,'1/3');
   byId('findText').value='absent';byId('findText').listeners.input();assert.equal(byId('findCount').textContent,'0/0');assert.equal(byId('findNext').disabled,true);
-  byId('findText').listeners.keydown({key:'Escape',preventDefault(){}});assert.equal(byId('findText').value,'');assert.equal(byId('logs').children.length,3);assert.ok(byId('logs').focused);
-  listeners.keydown({key:'f',metaKey:true,preventDefault(){}});assert.ok(byId('findText').focused && byId('findText').selected);
+  byId('findText').listeners.keydown({key:'Escape',preventDefault(){}});assert.equal(byId('findText').value,'');assert.equal(byId('logs').children.length,3);assert.ok(byId('logs').focused);assert.equal(byId('searchbar').hidden,true);
+  listeners.keydown({key:'f',metaKey:true,preventDefault(){}});assert.ok(byId('findText').focused && byId('findText').selected);assert.equal(byId('searchbar').hidden,false);
+  byId('findClose').listeners.click();assert.equal(byId('searchbar').hidden,true);
   assert.equal(sent.filter(m=>m.type==='filter').length,0);
 });

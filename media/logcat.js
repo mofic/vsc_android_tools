@@ -4,9 +4,22 @@ const byId = id => document.getElementById(id);
 for (const id of ['screenshot','record','newTab','split','apply','pause','clear','deviceClear','copy','import','export','restart']) byId(id).addEventListener('click', () => {
   if (id === 'apply') vscode.postMessage({ type: 'filter', filter: { level: byId('level').value, text: byId('text').value, regex: byId('regex').checked, tag: byId('tag').value, package: byId('package').value } });
   else vscode.postMessage({ type: id });
+  byId('more').open = false;
+  if (id === 'apply') byId('filterOptions').open = false;
 });
 byId('history').addEventListener('change', () => {
   if (byId('history').value) vscode.postMessage({ type: 'useFilter', filter: JSON.parse(byId('history').value) });
+});
+function showSearch(visible) {
+  byId('searchbar').hidden = !visible;
+  byId('findToggle').ariaExpanded = String(visible);
+  if (visible) { byId('findText').focus(); byId('findText').select(); }
+  else { byId('findText').value = ''; renderLogs(); byId('logs').focus(); }
+}
+byId('findToggle').addEventListener('click', () => showSearch(byId('searchbar').hidden));
+byId('findClose').addEventListener('click', () => showSearch(false));
+for (const id of ['text', 'tag', 'package']) byId(id).addEventListener('keydown', event => {
+  if (event.key === 'Enter') { event.preventDefault(); byId('apply').click(); }
 });
 let entries = [], hits = [], currentHit = -1, selectedMark;
 function selectHit(scroll) {
@@ -57,10 +70,28 @@ byId('findPrev').addEventListener('click', () => moveHit(-1));
 byId('findNext').addEventListener('click', () => moveHit(1));
 byId('findText').addEventListener('keydown', event => {
   if (event.key === 'Enter') { event.preventDefault(); moveHit(event.shiftKey ? -1 : 1); }
-  if (event.key === 'Escape') { event.preventDefault(); byId('findText').value = ''; renderLogs(); byId('logs').focus(); }
+  if (event.key === 'Escape') { event.preventDefault(); showSearch(false); }
 });
 window.addEventListener('keydown', event => {
-  if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'f') { event.preventDefault(); byId('findText').focus(); byId('findText').select(); }
+  if (event.key === 'Escape') {
+    for (const id of ['more', 'filterOptions']) if (byId(id).open) { byId(id).open = false; byId(id).querySelector('summary').focus(); }
+    if (!byId('searchbar').hidden) showSearch(false);
+  }
+  if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'f') { event.preventDefault(); showSearch(true); }
+});
+for (const id of ['more', 'filterOptions']) byId(id).addEventListener('toggle', () => {
+  const details = byId(id); if (!details.open) return;
+  byId(id === 'more' ? 'filterOptions' : 'more').open = false;
+  const panel = details.querySelector('div'), anchor = details.querySelector('summary').getBoundingClientRect();
+  panel.style.left = Math.max(8, Math.min(anchor.right - panel.offsetWidth, window.innerWidth - panel.offsetWidth - 8)) + 'px';
+  panel.style.top = document.querySelector('header').getBoundingClientRect().bottom + 4 + 'px';
+});
+window.addEventListener('resize', () => {
+  for (const id of ['more', 'filterOptions']) { byId(id).open = false; byId(id).querySelector('div').style.left = ''; }
+});
+window.addEventListener('click', event => {
+  if (!event.target.closest('#more')) byId('more').open = false;
+  if (!event.target.closest('#filterOptions')) byId('filterOptions').open = false;
 });
 window.addEventListener('message', ({ data }) => {
   if (data.type === 'history') {
@@ -75,14 +106,16 @@ window.addEventListener('message', ({ data }) => {
   if (data.type === 'filterApplied') {
     for (const id of ['level', 'text', 'tag', 'package']) byId(id).value = data.filter[id];
     byId('regex').checked = data.filter.regex;
+    byId('filterOptionsToggle').ariaPressed = String(!!(data.filter.tag || data.filter.package));
   }
   if (data.type === 'captureState') {
     byId('screenshot').disabled = !data.device || data.screenshotBusy;
     byId('record').disabled = !data.device || data.recordingBusy;
-    byId('record').textContent = data.recordingBusy ? '处理中…' : (data.recording ? '停止录屏' : '开始录屏');
+    byId('record').title = byId('record').ariaLabel = data.recordingBusy ? '录屏处理中…' : (data.recording ? '停止录屏并保存' : '开始录屏（无声，最长 180 秒）');
+    byId('record').ariaPressed = String(data.recording); byId('record').ariaBusy = String(data.recordingBusy);
   }
   if (data.type === 'status') byId('status').textContent = data.text;
-  if (data.type === 'paused') byId('pause').textContent = data.value ? '继续' : '暂停';
+  if (data.type === 'paused') { byId('pause').title = byId('pause').ariaLabel = data.value ? '继续日志显示' : '暂停日志显示'; byId('pause').ariaPressed = String(data.value); }
   if (data.type === 'lines') {
     entries = data.lines; renderLogs();
   }
