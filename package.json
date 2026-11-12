@@ -2,7 +2,7 @@
   "name": "android-device-tools",
   "displayName": "Android Device Tools",
   "description": "Android 设备、文件、应用与彩色 Logcat 管理",
-  "version": "0.1.3",
+  "version": "0.1.4",
   "publisher": "local-android-tools",
   "license": "MIT",
   "engines": {
@@ -143,6 +143,12 @@
         "title": "打开当前应用目录",
         "category": "Android Tools",
         "icon": "$(folder-library)"
+      },
+      {
+        "command": "androidTools.goParent",
+        "title": "返回设备上一级目录",
+        "category": "Android Tools",
+        "icon": "$(arrow-up)"
       }
     ],
     "viewsContainers": {
@@ -202,35 +208,35 @@
       "view/item/context": [
         {
           "command": "androidTools.open",
-          "when": "view == androidFiles"
+          "when": "view == androidFiles && viewItem != androidParent"
         },
         {
           "command": "androidTools.newFile",
-          "when": "view == androidFiles"
+          "when": "view == androidFiles && viewItem != androidParent"
         },
         {
           "command": "androidTools.newFolder",
-          "when": "view == androidFiles"
+          "when": "view == androidFiles && viewItem != androidParent"
         },
         {
           "command": "androidTools.rename",
-          "when": "view == androidFiles"
+          "when": "view == androidFiles && viewItem != androidParent"
         },
         {
           "command": "androidTools.delete",
-          "when": "view == androidFiles"
+          "when": "view == androidFiles && viewItem != androidParent"
         },
         {
           "command": "androidTools.upload",
-          "when": "view == androidFiles"
+          "when": "view == androidFiles && viewItem != androidParent"
         },
         {
           "command": "androidTools.uploadFolder",
-          "when": "view == androidFiles"
+          "when": "view == androidFiles && viewItem != androidParent"
         },
         {
           "command": "androidTools.download",
-          "when": "view == androidFiles"
+          "when": "view == androidFiles && viewItem != androidParent"
         }
       ]
     },

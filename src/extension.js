@@ -70,7 +70,7 @@ function activate(ctx) {
   async function confirm(message) { return await v.window.showWarningMessage(message, { modal: true }, '确认') === '确认'; }
   async function progress(title, action) { return v.window.withProgress({ location: v.ProgressLocation.Notification, title, cancellable: true }, (_, token) => action({ token, timeout: 1800000, onOutput: s => output.append(s) })); }
   function node(item) { return item || { remote: root, directory: true, serial: selected }; }
-  async function target(item) { const serial = item?.serial || await device(); return { ...node(item), serial }; }
+  async function target(item) { if (item?.parent) throw new Error('返回上一级不是设备文件，不能执行文件操作'); const serial = item?.serial || await device(); return { ...node(item), serial }; }
   const devicesProvider = { onDidChangeTreeData: deviceEvent.event, getChildren: () => deviceList, getTreeItem: d => {
     const item = new v.TreeItem(`${d.model || d.serial} (${d.state})`); item.description = `${d.serial}${selected === d.serial ? ' · 当前' : ''}`;
     item.iconPath = new v.ThemeIcon('device-mobile'); item.command = { command: 'androidTools.selectDevice', title: '选择设备', arguments: [d] }; return item;
@@ -78,8 +78,14 @@ function activate(ctx) {
   const filesProvider = { onDidChangeTreeData: fileEvent.event, getChildren: async item => {
     if (!selected && !item) return [];
     const serial = item?.serial || selected, dir = item?.target || item?.remote || root;
-    try { return (await adb.list(serial, dir)).map(f => ({ ...f, remote: path.posix.join(dir, f.name), serial })); } catch (e) { error(e); return []; }
+    const parent = !item && root !== '/' ? [{ parent: true, remote: path.posix.dirname(root), serial }] : [];
+    try { return [...parent, ...(await adb.list(serial, dir)).map(f => ({ ...f, remote: path.posix.join(dir, f.name), serial }))]; } catch (e) { error(e); return parent; }
   }, getTreeItem: f => {
+    if (f.parent) {
+      const item = new v.TreeItem('返回上一级', v.TreeItemCollapsibleState.None);
+      item.iconPath = new v.ThemeIcon('arrow-up'); item.tooltip = f.remote; item.contextValue = 'androidParent';
+      item.command = { command: 'androidTools.goParent', title: '返回上一级' }; return item;
+    }
     const item = new v.TreeItem(f.name, f.directory ? v.TreeItemCollapsibleState.Collapsed : v.TreeItemCollapsibleState.None);
     item.tooltip = `${f.serial}:${f.remote}${f.symlink ? ` → ${f.target}` : ''}`;
     item.iconPath = new v.ThemeIcon(f.symlink ? (f.directory ? 'file-symlink-directory' : 'file-symlink-file') : (f.directory ? 'folder' : 'file'));
@@ -87,6 +93,7 @@ function activate(ctx) {
   }};
   const handlers = {
     refresh, selectDevice: chooseDevice, selectProject: chooseProject,
+    goParent: async () => { await device(); root = path.posix.dirname(root); fileEvent.fire(); },
     openAppDirectory: async () => {
       const serial = await device(), packageId = await currentPackage(); if (!packageId) return;
       const directory = `/sdcard/Android/data/${packageId}`;
