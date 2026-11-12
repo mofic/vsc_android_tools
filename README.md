@@ -5,7 +5,7 @@ VS Code 安卓设备管理插件，支持原生 Android Gradle 项目和多根�
 ## 安装与运行
 
 1. 安装 Android SDK Platform Tools，在终端确认 `adb devices -l` 能看到已授权设备。
-2. 在 VS Code 执行 **Extensions: Install from VSIX…**，选择本仓库生成的 `android-device-tools-0.1.4.vsix`。
+2. 在 VS Code 执行 **Extensions: Install from VSIX…**，选择本仓库生成的 `android-device-tools-0.1.5.vsix`。
 3. 打开左侧 Android Tools 图标，点击设备选中目标。ADB 不在 PATH 时设置 `androidTools.adbPath`。
 4. 使用命令面板搜索 `Android Tools` 执行应用和文件操作；文件树提供右键菜单。
 
@@ -40,6 +40,12 @@ VS Code 安卓设备管理插件，支持原生 Android Gradle 项目和多根�
 ## 验证范围
 
 `node:test` 覆盖路径与 shell 引号、设备状态、多根扫描与深度、APK 元数据、日志过滤、进程失败。自动化不替代真机验证；实际安装、文件传输、权限和 Gradle 构建受设备/项目环境影响。
+
+### 导入离线日志
+
+Logcat 顶部点击“导入”，或从命令面板执行 **Android Tools: 导入 Logcat 日志**（设备视图的更多操作菜单也可进入），选择本地 `.log` / `.txt` 文件，无需连接设备。每次导入新开离线面板，不覆盖正在采集的实时日志。
+
+支持 UTF-8（含 BOM）、CRLF 和 ANSI 颜色转义清理；标准 `logcat -v threadtime` 及本插件导出的日志可识别级别、Tag 和 PID，其他行按原文显示。单文件最多 32MB，超过 10000 行时只保留末尾并提示。离线模式支持级别、关键词、正则、Tag 过滤和复制/导出；没有设备进程映射，因此禁用包名过滤、重连、暂停采集和清除设备日志。UTF-16/二进制文件请先转为 UTF-8 文本。
 
 ## Git
 

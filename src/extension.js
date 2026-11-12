@@ -4,7 +4,7 @@ const fs = require('node:fs/promises');
 const os = require('node:os');
 const path = require('node:path');
 const c = require('./core');
-const { openLogcat } = require('./logcat');
+const { openLogcat, importLogcat } = require('./logcat');
 function activate(ctx) {
   const adb = new c.Adb(() => v.workspace.getConfiguration('androidTools').get('adbPath', 'adb'));
   const output = v.window.createOutputChannel('Android Tools');
@@ -154,6 +154,7 @@ function activate(ctx) {
     },
     install: async () => { trust(); const serial = await device(); const files = await v.window.showOpenDialog({ canSelectMany: true, filters: { APK: ['apk'] } }); if (!files?.length) return;
       await progress(`安装到 ${serial}`, opts => adb.exec(serial, [files.length > 1 ? 'install-multiple' : 'install', '-r', ...files.map(f => f.fsPath)], opts)); },
+    importLogcat: async () => importLogcat(ctx, adb, error),
     logcat: async () => { const serial = await device(); openLogcat(ctx, adb, serial, error); }
   };
   async function launch(serial, packageId) {

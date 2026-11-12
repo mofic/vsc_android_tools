@@ -55,3 +55,11 @@ test('directory listing distinguishes links and resolves relative link targets',
   assert.equal(entries.find(e=>e.name==='alias').target, '/real.txt');
   assert.equal(entries.find(e=>e.name==="a ' b.txt").symlink, false);
 });
+test('import normalizes BOM CRLF ANSI and reports bounded retention', () => {
+  const result = c.importLogs('\ufeff\x1b[31m11-12 12:13:14.123  123  456 E App: failure\x1b[0m\r\nplain text\r\n', 1);
+  assert.equal(result.total, 2); assert.equal(result.entries.length, 1);
+  assert.equal(result.entries[0].line, 'plain text');
+  const entry = c.importLogs('\ufeff\x1b[31m11-12 12:13:14.123  123  456 E App: failure\x1b[0m\r\n').entries[0];
+  assert.equal(entry.level, 'E'); assert.equal(entry.tag, 'App');
+  assert.equal(c.importLogs('').total, 0);
+});

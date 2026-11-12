@@ -98,6 +98,12 @@ function parseLog(line) {
   const match = line.match(/^\s*\d+-\d+\s+[\d:.]+\s+(\d+)\s+\d+\s+([VDIWEF])\s+([^:]+):\s?(.*)$/);
   return match ? { line, pid: match[1], level: match[2], tag: match[3].trim(), message: match[4] } : { line, level: 'I', tag: '', pid: '' };
 }
+function importLogs(text, limit = 10000) {
+  if (text.includes('\0')) throw new Error('请选择 UTF-8 文本日志，暂不支持二进制或 UTF-16 文件');
+  const rows = text.replace(/^\uFEFF/, '').replace(/\x1b\[[0-?]*[ -/]*[@-~]/g, '').split(/\r?\n/);
+  if (rows[rows.length - 1] === '') rows.pop();
+  return { total: rows.length, entries: rows.slice(-limit).map(parseLog) };
+}
 function filterLog(entry, filter, pids) {
   if ('VDIWEF'.indexOf(entry.level) < 'VDIWEF'.indexOf(filter.level || 'V')) return false;
   if (filter.tag && !entry.tag.includes(filter.tag)) return false;
@@ -105,4 +111,4 @@ function filterLog(entry, filter, pids) {
   if (!filter.text) return true;
   return filter.regex ? new RegExp(filter.text, 'i').test(entry.line) : entry.line.toLowerCase().includes(filter.text.toLowerCase());
 }
-module.exports = { quote, remotePath, filename, devices, run, Adb, discover, artifacts, packageName, parseLog, filterLog };
+module.exports = { quote, remotePath, filename, devices, run, Adb, discover, artifacts, packageName, parseLog, filterLog, importLogs };

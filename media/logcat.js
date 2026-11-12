@@ -1,7 +1,7 @@
 'use strict';
 const vscode = acquireVsCodeApi();
 const byId = id => document.getElementById(id);
-for (const id of ['apply','pause','clear','deviceClear','copy','export','restart']) byId(id).addEventListener('click', () => {
+for (const id of ['apply','pause','clear','deviceClear','copy','import','export','restart']) byId(id).addEventListener('click', () => {
   if (id === 'apply') vscode.postMessage({ type: 'filter', filter: { level: byId('level').value, text: byId('text').value, regex: byId('regex').checked, tag: byId('tag').value, package: byId('package').value } });
   else vscode.postMessage({ type: id });
 });
