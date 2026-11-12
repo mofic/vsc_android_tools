@@ -108,6 +108,33 @@ test('activates every contributed command and tree, then disposes timers', async
     await commands.get('androidTools.save')();assert.match(bars[1].text,/待同步/);Adb.prototype.exec=transferExec;
 
 
+    const core=require('../src/core'), previousRun=core.run, previousExec=Adb.prototype.exec;
+    const sequence=[];
+    await fs.writeFile(path.join(project,'gradlew'),'');
+    mock.window.showQuickPick=async()=>':app:assembleDebug';
+    let clearFails=false, buildFails=false;
+    core.run=async(_,args)=>{
+      if(args.includes('tasks'))return ':app:assembleDebug - Assemble debug';
+      sequence.push('compile');if(buildFails)throw new Error('build failed');return '';
+    };
+    Adb.prototype.exec=async(serial,args)=>{
+      if(args[0]==='install'){sequence.push('install');return '';}
+      if(args[1]==="'pm' 'clear' 'com.example.debug'"){sequence.push('clear');return clearFails?'Failed':'Success';}
+      if(args[1]?.includes('resolve-activity'))return 'com.example.debug/.MainActivity';
+      if(args[1]?.startsWith("'am' 'start'")){sequence.push('launch');return '';}
+      return previousExec(serial,args);
+    };
+    try {
+      await commands.get('androidTools.build')();assert.deepEqual(sequence,['compile','install','launch']);sequence.length=0;
+      await commands.get('androidTools.clearDataAndRun')();assert.deepEqual(sequence,['compile','install','clear','launch']);sequence.length=0;
+      mock.window.showWarningMessage=async()=>undefined;
+      await commands.get('androidTools.clearDataAndRun')();assert.deepEqual(sequence,['compile']);sequence.length=0;
+      mock.window.showWarningMessage=savedWarning;clearFails=true;
+      await commands.get('androidTools.clearDataAndRun')();assert.deepEqual(sequence,['compile','install','clear']);assert.match(errors.pop(),/Failed/);sequence.length=0;
+      clearFails=false;buildFails=true;
+      await commands.get('androidTools.clearDataAndRun')();assert.deepEqual(sequence,['compile']);assert.match(errors.pop(),/build failed/);sequence.length=0;
+      await commands.get('androidTools.launch')();assert.deepEqual(sequence,['launch']);
+    }finally{core.run=previousRun;Adb.prototype.exec=previousExec;}
     inaccessible = true; await commands.get('androidTools.refresh')();
     await commands.get('androidTools.openAppDirectory')();
     assert.match(errors.pop(), /目录不存在或无权访问/);

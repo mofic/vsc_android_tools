@@ -2,7 +2,7 @@
   "name": "android-device-tools",
   "displayName": "Android Device Tools",
   "description": "Android 设备、文件、应用与彩色 Logcat 管理",
-  "version": "0.2.2",
+  "version": "0.2.3",
   "publisher": "local-android-tools",
   "license": "MIT",
   "engines": {
@@ -99,8 +99,14 @@
       },
       {
         "command": "androidTools.build",
-        "title": "构建并安装启动",
+        "title": "运行（编译、安装并启动）",
         "category": "Android Tools"
+      },
+      {
+        "command": "androidTools.clearDataAndRun",
+        "title": "清除数据并运行",
+        "category": "Android Tools",
+        "icon": "$(debug-restart)"
       },
       {
         "command": "androidTools.install",

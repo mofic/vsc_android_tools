@@ -207,29 +207,36 @@ function activate(ctx) {
       if (t.directory) { try { await fs.access(local); if (!await confirm(`本地 ${local} 已存在，合并目录并覆盖同名文件？`)) return; } catch(e) { if (e.code !== 'ENOENT') throw e; } }
       await progress(`下载 ${t.serial}:${t.remote}`, opts => adb.pullFile(t.serial, t.remote, dest.fsPath, opts)); v.window.showInformationMessage(`已下载到 ${dest.fsPath}`);
     },
-    build: async () => {
-      trust(); const serial = await device(), p = await getProject();
-      const wrapper = path.join(p, process.platform === 'win32' ? 'gradlew.bat' : 'gradlew'); await fs.access(wrapper);
-      const gradle = (taskArgs, opts) => process.platform === 'win32' ? c.run('cmd.exe', ['/d', '/c', 'gradlew.bat', ...taskArgs], { ...opts, cwd: p }) : c.run('/bin/sh', [wrapper, ...taskArgs], { ...opts, cwd: p });
-      const listing = await progress('识别模块和构建变体', opts => gradle(['tasks', '--all', '--console=plain'], opts));
-      const tasks = [...new Set([...listing.matchAll(/^([\w:]*assemble[\w]*)\s+-/gm)].map(m => m[1]))];
-      const pick = await v.window.showQuickPick([...tasks, '手动输入任务…'], { placeHolder: '选择应用模块与构建变体' });
-      if (!pick) return;
-      const task = pick === '手动输入任务…' ? await v.window.showInputBox({ value: ':app:assembleDebug', prompt: 'Gradle 构建任务' }) : pick; if (!task) return;
-      if (!/^:?[A-Za-z0-9_:]+$/.test(task)) throw new Error('无效 Gradle 任务');
-      await progress(`构建 ${p}`, opts => gradle([task, '--console=plain'], opts));
-      const a = await artifact(p); if (!a) return;
-      if (a.filters.length) throw new Error('此 APK 含拆分过滤条件，请使用通用 APK 或手动安装完整 APK 集');
-      c.packageName(a.packageName);
-      await progress(`安装 ${serial}`, opts => adb.exec(serial, ['install', '-r', a.apk], opts));
-      await ctx.workspaceState.update(`package:${p}`, c.packageName(a.packageName));
-      await launch(serial, a.packageName);
-    },
+    build: () => buildAndRun(false),
+    clearDataAndRun: () => buildAndRun(true),
     install: async () => { trust(); const serial = await device(); const files = await v.window.showOpenDialog({ canSelectMany: true, filters: { APK: ['apk'] } }); if (!files?.length) return;
       await progress(`安装到 ${serial}`, opts => adb.exec(serial, [files.length > 1 ? 'install-multiple' : 'install', '-r', ...files.map(f => f.fsPath)], opts)); },
     importLogcat: async () => importLogcat(ctx, adb, error),
     logcat: async () => { const serial = await device(); openLogcat(ctx, adb, serial, error, undefined, v.ViewColumn.Active, currentPackage); }
   };
+  async function buildAndRun(clearData) {
+    trust(); const serial = await device(), p = await getProject();
+    const wrapper = path.join(p, process.platform === 'win32' ? 'gradlew.bat' : 'gradlew'); await fs.access(wrapper);
+    const gradle = (taskArgs, opts) => process.platform === 'win32' ? c.run('cmd.exe', ['/d', '/c', 'gradlew.bat', ...taskArgs], { ...opts, cwd: p }) : c.run('/bin/sh', [wrapper, ...taskArgs], { ...opts, cwd: p });
+    const listing = await progress('识别模块和构建变体', opts => gradle(['tasks', '--all', '--console=plain'], opts));
+    const tasks = [...new Set([...listing.matchAll(/^([\w:]*assemble[\w]*)\s+-/gm)].map(m => m[1]))];
+    const pick = await v.window.showQuickPick([...tasks, '手动输入任务…'], { placeHolder: '选择应用模块与构建变体' });
+    if (!pick) return;
+    const task = pick === '手动输入任务…' ? await v.window.showInputBox({ value: ':app:assembleDebug', prompt: 'Gradle 构建任务' }) : pick; if (!task) return;
+    if (!/^:?[A-Za-z0-9_:]+$/.test(task)) throw new Error('无效 Gradle 任务');
+    await progress(`构建 ${p}`, opts => gradle([task, '--console=plain'], opts));
+    const a = await artifact(p); if (!a) return;
+    if (a.filters.length) throw new Error('此 APK 含拆分过滤条件，请使用通用 APK 或手动安装完整 APK 集');
+    c.packageName(a.packageName);
+    if (clearData && !await confirm(`清除数据并运行：${serial} / ${p} / ${a.packageName}？应用数据将被永久删除。`)) return;
+    await progress(`安装 ${serial}`, opts => adb.exec(serial, ['install', '-r', a.apk], opts));
+    await ctx.workspaceState.update(`package:${p}`, c.packageName(a.packageName));
+    if (clearData) {
+      const result = await adb.shell(serial, ['pm', 'clear', a.packageName]);
+      if (result.trim() !== 'Success') throw new Error(result || '清除应用数据失败');
+    }
+    await launch(serial, a.packageName);
+  }
   async function launch(serial, packageId) {
     const component = (await adb.shell(serial, ['cmd', 'package', 'resolve-activity', '--brief', packageId])).trim().split(/\r?\n/).pop();
     if (!component?.includes('/')) throw new Error('找不到可启动 Activity');
