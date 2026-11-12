@@ -2,7 +2,7 @@
   "name": "android-device-tools",
   "displayName": "Android Device Tools",
   "description": "Android 设备、文件、应用与彩色 Logcat 管理",
-  "version": "0.1.13",
+  "version": "0.2.0",
   "publisher": "local-android-tools",
   "license": "MIT",
   "engines": {
@@ -23,7 +23,7 @@
   },
   "scripts": {
     "test": "node --test test/*.test.js",
-    "check": "node --check src/core.js && node --check src/extension.js && node --check src/logcat.js && node --check media/logcat.js && node --check src/capture.js",
+    "check": "node --check src/core.js && node --check src/extension.js && node --check src/logcat.js && node --check media/logcat.js && node --check src/capture.js && node --check src/log-query.js",
     "package": "npx @vscode/vsce package --no-dependencies"
   },
   "contributes": {
@@ -155,6 +155,42 @@
         "title": "导入 Logcat 日志",
         "category": "Android Tools",
         "icon": "$(folder-opened)"
+      },
+      {
+        "command": "androidTools.goBack",
+        "title": "后退设备目录",
+        "category": "Android Tools",
+        "icon": "$(arrow-left)"
+      },
+      {
+        "command": "androidTools.goForward",
+        "title": "前进设备目录",
+        "category": "Android Tools",
+        "icon": "$(arrow-right)"
+      },
+      {
+        "command": "androidTools.recentDirectories",
+        "title": "最近设备目录",
+        "category": "Android Tools",
+        "icon": "$(history)"
+      },
+      {
+        "command": "androidTools.enterDirectory",
+        "title": "在此目录浏览",
+        "category": "Android Tools",
+        "icon": "$(folder-opened)"
+      },
+      {
+        "command": "androidTools.copyPath",
+        "title": "复制设备路径",
+        "category": "Android Tools",
+        "icon": "$(copy)"
+      },
+      {
+        "command": "androidTools.refreshDirectory",
+        "title": "刷新所选目录",
+        "category": "Android Tools",
+        "icon": "$(refresh)"
       }
     ],
     "viewsContainers": {
@@ -182,71 +218,138 @@
       "view/title": [
         {
           "command": "androidTools.refresh",
-          "when": "view == androidDevices || view == androidFiles",
+          "when": "view == androidDevices",
           "group": "navigation"
         },
         {
           "command": "androidTools.selectDevice",
-          "when": "view == androidDevices || view == androidFiles",
+          "when": "view == androidDevices",
           "group": "navigation"
         },
         {
           "command": "androidTools.selectProject",
-          "when": "view == androidDevices || view == androidFiles",
+          "when": "view == androidDevices",
           "group": "navigation"
         },
         {
           "command": "androidTools.browse",
-          "when": "view == androidDevices || view == androidFiles",
+          "when": "view == androidDevices",
           "group": "navigation"
         },
         {
           "command": "androidTools.logcat",
-          "when": "view == androidDevices || view == androidFiles",
+          "when": "view == androidDevices",
           "group": "navigation"
         },
         {
           "command": "androidTools.openAppDirectory",
-          "when": "view == androidDevices || view == androidFiles",
+          "when": "view == androidDevices",
           "group": "navigation"
         },
         {
           "command": "androidTools.importLogcat",
           "when": "view == androidDevices",
           "group": "2_logcat"
+        },
+        {
+          "command": "androidTools.goBack",
+          "when": "view == androidFiles",
+          "group": "navigation@0"
+        },
+        {
+          "command": "androidTools.goForward",
+          "when": "view == androidFiles",
+          "group": "navigation@1"
+        },
+        {
+          "command": "androidTools.goParent",
+          "when": "view == androidFiles",
+          "group": "navigation@2"
+        },
+        {
+          "command": "androidTools.refresh",
+          "when": "view == androidFiles",
+          "group": "navigation@3"
+        },
+        {
+          "command": "androidTools.browse",
+          "when": "view == androidFiles",
+          "group": "navigation@4"
+        },
+        {
+          "command": "androidTools.recentDirectories",
+          "when": "view == androidFiles",
+          "group": "2_files"
+        },
+        {
+          "command": "androidTools.openAppDirectory",
+          "when": "view == androidFiles",
+          "group": "2_files"
+        },
+        {
+          "command": "androidTools.newFile",
+          "when": "view == androidFiles",
+          "group": "2_files"
+        },
+        {
+          "command": "androidTools.newFolder",
+          "when": "view == androidFiles",
+          "group": "2_files"
+        },
+        {
+          "command": "androidTools.upload",
+          "when": "view == androidFiles",
+          "group": "2_files"
+        },
+        {
+          "command": "androidTools.uploadFolder",
+          "when": "view == androidFiles",
+          "group": "2_files"
         }
       ],
       "view/item/context": [
         {
           "command": "androidTools.open",
-          "when": "view == androidFiles && viewItem != androidParent"
+          "when": "view == androidFiles && (viewItem == androidFile || viewItem == androidLinkFile)"
         },
         {
           "command": "androidTools.newFile",
-          "when": "view == androidFiles && viewItem != androidParent"
+          "when": "view == androidFiles && (viewItem == androidDirectory || viewItem == androidLinkDirectory)"
         },
         {
           "command": "androidTools.newFolder",
-          "when": "view == androidFiles && viewItem != androidParent"
+          "when": "view == androidFiles && (viewItem == androidDirectory || viewItem == androidLinkDirectory)"
         },
         {
           "command": "androidTools.rename",
-          "when": "view == androidFiles && viewItem != androidParent"
+          "when": "view == androidFiles && (viewItem == androidFile || viewItem == androidDirectory || viewItem == androidLinkFile || viewItem == androidLinkDirectory)"
         },
         {
           "command": "androidTools.delete",
-          "when": "view == androidFiles && viewItem != androidParent"
+          "when": "view == androidFiles && (viewItem == androidFile || viewItem == androidDirectory || viewItem == androidLinkFile || viewItem == androidLinkDirectory)"
         },
         {
           "command": "androidTools.upload",
-          "when": "view == androidFiles && viewItem != androidParent"
+          "when": "view == androidFiles && (viewItem == androidDirectory || viewItem == androidLinkDirectory)"
         },
         {
           "command": "androidTools.uploadFolder",
-          "when": "view == androidFiles && viewItem != androidParent"
+          "when": "view == androidFiles && (viewItem == androidDirectory || viewItem == androidLinkDirectory)"
         },
         {
           "command": "androidTools.download",
+          "when": "view == androidFiles && (viewItem == androidFile || viewItem == androidDirectory || viewItem == androidLinkFile || viewItem == androidLinkDirectory)"
+        },
+        {
+          "command": "androidTools.enterDirectory",
+          "when": "view == androidFiles && (viewItem == androidDirectory || viewItem == androidLinkDirectory)"
+        },
+        {
+          "command": "androidTools.copyPath",
+          "when": "view == androidFiles && viewItem != androidParent"
+        },
+        {
+          "command": "androidTools.refreshDirectory",
           "when": "view == androidFiles && viewItem != androidParent"
         }
       ]

@@ -7,10 +7,13 @@ test('log search highlights literal case-insensitive matches, wraps navigation a
   class Element{
     constructor(tag='div'){this.tag=tag;this.children=[];this.value='';this.checked=false;this.listeners={};this.scrollTop=0;this.scrollHeight=100;const classes=new Set();this.classList={add:x=>classes.add(x),remove:x=>classes.delete(x),contains:x=>classes.has(x)};}
     addEventListener(type,fn){this.listeners[type]=fn;}
-    append(node){if(node.tag==='fragment')this.children.push(...node.children);else this.children.push(node);}
+    append(node){if(node.tag==='fragment'){for(const child of node.children)this.append(child);}else{this.children.push(node);node.parentNode=this;}}
+    remove(){if(this.parentNode)this.parentNode.children=this.parentNode.children.filter(node=>node!==this);this.parentNode=undefined;}
     replaceChildren(...nodes){this.children=[];for(const node of nodes)this.append(node);this._text='';}
     set textContent(text){this.children=[];this._text=text;}
     get textContent(){return this._text || this.children.map(n=>n.textContent).join('');}
+    getBoundingClientRect(){return {top:0,bottom:20};}
+    get isConnected(){return !!this.parentNode;}
     scrollIntoView(){this.scrolled=true;}
     focus(){this.focused=true;}
     select(){this.selected=true;}
@@ -38,4 +41,11 @@ test('log search highlights literal case-insensitive matches, wraps navigation a
   listeners.keydown({key:'f',metaKey:true,preventDefault(){}});assert.ok(byId('findText').focused && byId('findText').selected);assert.equal(byId('searchbar').hidden,false);
   byId('findClose').listeners.click();assert.equal(byId('searchbar').hidden,true);
   assert.equal(sent.filter(m=>m.type==='filter').length,0);
+  const sequence=[1,2,3].map(id=>({id,line:'row '+id,level:'I'}));listeners.message({data:{type:'lines',lines:sequence}});
+  const retained=byId('logs').children[1];listeners.message({data:{type:'lines',lines:[...sequence.slice(1),{id:4,line:'row 4',level:'I'}]}});
+  assert.equal(byId('logs').children[0],retained);assert.ok(!byId('logs').textContent.includes('row 1'));
+  const structured={id:5,line:'raw',date:'11-12',time:'12:00:00.000',pid:'1',tid:'2',processName:'com.demo',level:'E',tag:'Demo',message:'failure'};
+  listeners.message({data:{type:'lines',lines:[structured]}});assert.equal(byId('logs').children[0].children.length,6);assert.match(byId('logs').textContent,/com.demo/);
+  byId('logs').listeners.wheel({deltaY:-1});assert.equal(byId('scroll').checked,false);byId('jumpEnd').listeners.click();assert.equal(byId('scroll').checked,true);
+
 });

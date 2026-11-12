@@ -8,7 +8,7 @@ test('offline import renders, filters, exports without ADB; cancel and size erro
   const uri={fsPath:'/tmp/sample.log'}, content='11-12 12:13:14.123  123  456 E App: failure\n11-12 12:13:14.124  123  456 D Other: debug\n';
   const mock={
     Uri:{joinPath:(_, ...parts)=>parts.join('/'),file:fsPath=>({fsPath})},ViewColumn:{Active:-1,Beside:-2},
-    window:{showOpenDialog:async()=>cancelled?undefined:[uri],showSaveDialog:async()=>uri,createWebviewPanel:()=>{
+    window:{showInputBox:async()=> 'Errors',showOpenDialog:async()=>cancelled?undefined:[uri],showSaveDialog:async()=>uri,createWebviewPanel:()=>{
       const panel={webview:{asWebviewUri:x=>x,cspSource:'test',postMessage:m=>messages.push(m),onDidReceiveMessage:fn=>{onMessage=fn;}},onDidDispose(){},dispose(){}};
       panels.push(panel);return panel;
     }},
@@ -36,6 +36,10 @@ test('offline import renders, filters, exports without ADB; cancel and size erro
     await onMessage({type:'filter',filter:{level:'E',text:'[',regex:true,tag:'',package:''}});
     assert.ok(errors.pop() instanceof SyntaxError);
     assert.equal(JSON.stringify(state.get('logcat.recentFilters')),before);
+    const favorite={level:'E',text:'',tag:'',package:'',query:'message:failure level:ERROR'};
+    await onMessage({type:'favorite',filter:favorite});assert.equal(state.get('logcat.favorites')[0].name,'Errors');
+    await onMessage({type:'useFilter',filter:state.get('logcat.favorites')[0].filter});await onMessage({type:'copy'});assert.match(clipboard,/failure/);
+    await onMessage({type:'unfavorite',name:'Errors'});assert.equal(state.get('logcat.favorites').length,0);
     cancelled=true; await onMessage({type:'import'}); assert.equal(panels.length,1);
     cancelled=false;size=33*1024*1024;
     await assert.rejects(importLogcat({subscriptions},adb,e=>errors.push(e)),/超过 32MB/);

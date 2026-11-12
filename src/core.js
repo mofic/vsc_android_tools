@@ -2,6 +2,7 @@
 const fs = require('node:fs/promises');
 const path = require('node:path');
 const { spawn } = require('node:child_process');
+const { compileQuery } = require('./log-query');
 function quote(value) { return "'" + String(value).replace(/'/g, "'\\''") + "'"; }
 function remotePath(value) {
   if (typeof value !== 'string' || !value.startsWith('/') || /[\x00-\x1f\x7f]/.test(value) || value.split('/').includes('..')) throw new Error('设备路径必须是绝对路径，且不含 .. 或控制字符');
@@ -41,22 +42,22 @@ class Adb {
     // Android mksh runs printf externally; batch names to avoid one process per entry.
     const script = `cd ${quote(directory)} || exit 1
 [ -r . ] && [ -x . ] || { echo 'Permission denied' >&2; exit 1; }
-printf 'P\\000%s\\000\\000' "$(pwd -P)"
+printf 'P\\000%s\\000\\000\\000\\000' "$(pwd -P)"
 set --; count=0
 for entry in .[!.]* ..?* *; do
   case "$entry" in '.[!.]*'|'..?*'|'*') [ -e "$entry" ] || [ -L "$entry" ] || continue;; esac
   set -- "$@" "$entry"; count=$((count+1))
-  if [ "$count" -eq 256 ]; then printf 'U\\000%s\\000\\000' "$@"; set --; count=0; fi
+  if [ "$count" -eq 256 ]; then printf 'U\\000%s\\000\\000\\000\\000' "$@"; set --; count=0; fi
 done
-[ "$#" -eq 0 ] || printf 'U\\000%s\\000\\000' "$@"
-find -L . -mindepth 1 -maxdepth 1 -printf '%M\\000%f\\000%l\\000' 2>/dev/null || true`;
+[ "$#" -eq 0 ] || printf 'U\\000%s\\000\\000\\000\\000' "$@"
+find -L . -mindepth 1 -maxdepth 1 -printf '%M\\000%f\\000%l\\000%s\\000%T@\\000' 2>/dev/null || true`;
     const fields = (await this.exec(serial, ['shell', script], { timeout: 15000 })).split('\0');
     const entries = new Map();
     let physicalDirectory = directory;
-    for (let i = 0; i + 2 < fields.length; i += 3) {
-      const [kind, name, target] = fields.slice(i, i + 3);
+    for (let i = 0; i + 4 < fields.length; i += 5) {
+      const [kind, name, target, size, modified] = fields.slice(i, i + 5);
       if (kind === 'P') { physicalDirectory = name; continue; }
-      entries.set(name, { name, directory: kind.startsWith('d'), symlink: !!target || kind.startsWith('l'), unknown: kind === 'U', target: target ? path.posix.resolve(physicalDirectory, target) : undefined });
+      entries.set(name, { name, directory: kind.startsWith('d'), symlink: !!target || kind.startsWith('l'), unknown: kind === 'U', size: size !== '' && Number.isFinite(Number(size)) ? Number(size) : undefined, modified: modified !== '' && Number.isFinite(Number(modified)) ? Number(modified) * 1000 : undefined, target: target ? path.posix.resolve(physicalDirectory, target) : undefined });
     }
     return [...entries.values()].sort((a,b) => Number(b.directory)-Number(a.directory) || a.name.localeCompare(b.name));
   }
@@ -96,9 +97,18 @@ function packageName(value) {
   if (!/^[A-Za-z_][\w]*(\.[A-Za-z_][\w]*)+$/.test(value || '')) throw new Error('无效 Android 包名');
   return value;
 }
+function formatSize(bytes) {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1048576) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / 1048576).toFixed(1)} MB`;
+}
 function parseLog(line) {
-  const match = line.match(/^\s*\d+-\d+\s+[\d:.]+\s+(\d+)\s+\d+\s+([VDIWEF])\s+([^:]+):\s?(.*)$/);
-  return match ? { line, pid: match[1], level: match[2], tag: match[3].trim(), message: match[4] } : { line, level: 'I', tag: '', pid: '' };
+  const match = line.match(/^\s*(\d+-\d+)\s+([\d:.]+)\s+(\d+)\s+(\d+)\s+([VDIWEF])\s+([^:]+):\s?(.*)$/);
+  if (!match) return { line, level: 'I', tag: '', pid: '' };
+  const year = new Date().getFullYear();
+  let timestamp = new Date(`${year}-${match[1]}T${match[2]}`).getTime();
+  if (timestamp > Date.now() + 86400000) timestamp = new Date(`${year - 1}-${match[1]}T${match[2]}`).getTime();
+  return { line, date: match[1], time: match[2], timestamp, pid: match[3], tid: match[4], level: match[5], tag: match[6].trim(), message: match[7] };
 }
 function importLogs(text, limit = 10000) {
   if (text.includes('\0')) throw new Error('请选择 UTF-8 文本日志，暂不支持二进制或 UTF-16 文件');
@@ -111,7 +121,8 @@ function normalizeLogFilter(f) {
   if (f.regex && /\([^)]*[+*][^)]*\)[+*{]/.test(f.text)) throw new Error('请避免嵌套重复的正则表达式');
   if (f.regex) new RegExp(f.text);
   const next = String(f.package || '').trim(); if (next) packageName(next);
-  return { level: f.level, text: f.text, regex: !!f.regex, tag: f.tag, package: next };
+  const query = f.query || ''; compileQuery(query);
+  return { level: f.level, text: f.text, regex: !!f.regex, tag: f.tag, package: next, ...(query ? { query } : {}) };
 }
 function recentFilters(history, value) {
   const next = normalizeLogFilter(value), key = JSON.stringify(next), entries = [next];
@@ -128,4 +139,4 @@ function filterLog(entry, filter, pids) {
   if (!filter.text) return true;
   return filter.regex ? new RegExp(filter.text, 'i').test(entry.line) : entry.line.toLowerCase().includes(filter.text.toLowerCase());
 }
-module.exports = { quote, remotePath, filename, devices, run, Adb, discover, artifacts, packageName, parseLog, filterLog, importLogs, normalizeLogFilter, recentFilters };
+module.exports = { quote, remotePath, filename, devices, run, Adb, discover, artifacts, packageName, parseLog, filterLog, importLogs, normalizeLogFilter, recentFilters, formatSize };

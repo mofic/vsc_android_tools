@@ -10,12 +10,7 @@ svg{width:16px;height:16px;stroke:currentColor;stroke-width:1.7;fill:none;stroke
 input,select{color:var(--vscode-input-foreground);background:var(--vscode-input-background);border:1px solid var(--vscode-input-border,transparent);border-radius:2px;height:26px;padding:3px 6px;min-width:0}
 #level{width:48px}
 .keyword{display:flex;align-items:center;flex:1;min-width:100px;position:relative}
-#text{width:100%;padding-right:31px}
-.regex-toggle{position:absolute;right:4px;display:flex;align-items:center;cursor:pointer}
-.regex-toggle input{position:absolute;opacity:0;width:22px;height:22px;margin:0;cursor:pointer}
-.regex-toggle span{padding:1px 4px;border-radius:2px;line-height:20px}
-.regex-toggle input:checked+span{background:var(--vscode-inputOption-activeBackground);outline:1px solid var(--vscode-inputOption-activeBorder)}
-.regex-toggle input:focus-visible+span{outline:1px solid var(--vscode-focusBorder)}
+#query{width:100%}
 .icon-button,.popover>summary{display:flex;align-items:center;justify-content:center;flex-shrink:0;width:26px;height:26px;padding:4px;border:0;border-radius:3px;background:transparent;color:var(--vscode-icon-foreground,var(--vscode-foreground))}
 .icon-button:hover:not(:disabled),.popover>summary:hover,.popover[open]>summary{background:var(--vscode-toolbar-hoverBackground)}
 .icon-button[aria-pressed=true],summary[aria-pressed=true]{color:var(--vscode-inputOption-activeForeground);background:var(--vscode-inputOption-activeBackground)}
@@ -54,3 +49,7 @@ mark{background:var(--vscode-editor-findMatchHighlightBackground,#654e1c);color:
 mark.current-match{background:var(--vscode-editor-findMatchBackground,#8b6700);outline:1px solid var(--vscode-editor-findMatchBorder,var(--vscode-focusBorder))}
 
 footer{display:flex;gap:12px;align-items:center}#packageStatus{max-width:55%;overflow:hidden;text-overflow:ellipsis;flex-shrink:0}#status{overflow:hidden;text-overflow:ellipsis;min-width:0}
+
+.log-row{display:grid;grid-template-columns:142px 88px minmax(100px,190px) 22px minmax(60px,140px) minmax(0,1fr);column-gap:10px;align-items:start}.log-row>span{min-width:0}.log-time,.log-pid,.log-package{color:var(--vscode-descriptionForeground);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.log-tag{overflow:hidden;text-overflow:ellipsis}.log-message{white-space:inherit;overflow-wrap:inherit}.raw-log{display:block}#logs[data-compact=true] .log-time,#logs[data-compact=true] .log-pid{display:none}#logs[data-compact=true] .log-row{grid-template-columns:minmax(100px,190px) 22px minmax(60px,140px) minmax(0,1fr)}#logs[style*="white-space: pre;"] .log-message{min-width:max-content}#pauseStatus{color:var(--vscode-editorWarning-foreground);white-space:nowrap}.favorite-actions{display:flex;gap:4px;margin-bottom:10px}.favorite-actions button{color:var(--vscode-button-foreground);background:var(--vscode-button-background);border:0;padding:4px 6px;border-radius:2px}.filter-options{max-height:70vh;overflow:auto}
+
+#query[aria-invalid=true]{outline:1px solid var(--vscode-inputValidation-errorBorder)}@media(max-width:600px){.log-time,.log-pid{display:none}.log-row{grid-template-columns:minmax(80px,140px) 22px minmax(50px,100px) minmax(0,1fr)}}

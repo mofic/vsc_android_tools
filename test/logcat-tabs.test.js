@@ -17,7 +17,7 @@ test('Logcat tabs split and keep independent filters, buffers, pause and process
     const {openLogcat}=require('../src/logcat');
     const state = new Map(), globalState={get:(key,fallback)=>state.get(key) || fallback,update:async(key,value)=>state.set(key,value)};
     const ctx={subscriptions,extensionUri:'test',globalState}, adb={binary:()=> 'adb',shell:async()=> 'PID NAME\n123 com.example.app:remote\n'}, fail=e=>{throw e;};
-    const first=openLogcat(ctx,adb,'serial',fail);
+    const first=openLogcat(ctx,adb,'serial',fail,undefined,mock.ViewColumn.Active,async()=> 'com.example.app');
     assert.match(first.webview.html,/id="newTab"/);
     await first.send({type:'ready'});await first.send({type:'newTab'});
     const second=panels[1];assert.notEqual(first.title,second.title);assert.equal(second.column,mock.ViewColumn.Active);
@@ -33,6 +33,7 @@ test('Logcat tabs split and keep independent filters, buffers, pause and process
     await first.send({type:'copy'});assert.match(clipboard,/failure/);assert.ok(!clipboard.includes('debug'));
     await second.send({type:'copy'});assert.match(clipboard,/debug/);
     await first.send({type:'pause'});assert.equal(first.messages.at(-1).type,'paused');assert.ok(!second.messages.some(m=>m.type==='paused'));
+    processes[0].stdout.emit('data',data);assert.equal(first.messages.at(-1).pending,2);
     await first.send({type:'clear'});await second.send({type:'copy'});assert.match(clipboard,/debug/);
     first.dispose();assert.ok(processes[0].killed);assert.equal(processes[1].killed,false);
     await second.send({type:'split'});assert.equal(panels[2].column,mock.ViewColumn.Beside);
@@ -46,5 +47,6 @@ test('Logcat tabs split and keep independent filters, buffers, pause and process
     await second.send({type:'useFilter',filter:state.get('logcat.recentFilters')[0]});
     await second.send({type:'copy'});assert.match(clipboard,/failure/);assert.ok(!clipboard.includes('debug'));
     assert.equal(state.get('logcat.recentFilters').length,3);
+    await second.send({type:'filter',filter:{level:'V',text:'',tag:'',package:'',query:'package:mine level:ERROR'}});await second.send({type:'copy'});assert.match(clipboard,/failure/);assert.ok(!clipboard.includes('debug'));
   } finally {for(const item of subscriptions)item.dispose();Module._load=original;}
 });

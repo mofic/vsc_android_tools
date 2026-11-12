@@ -5,6 +5,7 @@ const fs = require('node:fs/promises');
 const os = require('node:os');
 const path = require('node:path');
 const c = require('../src/core');
+const metadata = fields => { const result=[]; for(let i=0;i<fields.length;i+=3)result.push(...fields.slice(i,i+3),'',''); return result.join('\0')+'\0'; };
 test('remote paths and shell metacharacters stay literal', () => {
   assert.equal(c.quote("a'b;$(id)"), "'a'\\''b;$(id)'");
   assert.equal(c.remotePath('/sdcard/a b'), '/sdcard/a b');
@@ -47,7 +48,7 @@ test('process errors and nonzero exit reject', async()=>{
 });
 test('directory listing distinguishes links and resolves relative link targets', async () => {
   const adb = new c.Adb(() => 'adb');
-  adb.exec = async () => ['drwxr-xr-x','folder','','drwxr-xr-x','sdcard','/storage/emulated/0','-rw-r--r--','alias','../real.txt','-rw-r--r--',"a ' b.txt",''].join('\0') + '\0';
+  adb.exec = async () => metadata(['drwxr-xr-x','folder','','drwxr-xr-x','sdcard','/storage/emulated/0','-rw-r--r--','alias','../real.txt','-rw-r--r--',"a ' b.txt",'']);
   const entries = await adb.list('serial','/example');
   assert.equal(entries.find(e=>e.name==='sdcard').directory, true);
   assert.equal(entries.find(e=>e.name==='sdcard').symlink, true);
@@ -78,7 +79,7 @@ test('recent filters validate, deduplicate, move reused entries first and retain
 
 test('batch directory metadata preserves inaccessible, hidden and special entries', async () => {
   const adb=new c.Adb(()=> 'adb');let script;
-  adb.exec=async(_,args)=>{script=args[1];return ['U','restricted','','U','.hidden','','U','link','', 'drwxr-xr-x','folder','','-rw-r--r--','.hidden','','drwxr-xr-x','link','../folder','prw-------','pipe',''].join('\0')+'\0';};
+  adb.exec=async(_,args)=>{script=args[1];return metadata(['U','restricted','','U','.hidden','','U','link','', 'drwxr-xr-x','folder','','-rw-r--r--','.hidden','','drwxr-xr-x','link','../folder','prw-------','pipe','']);};
   const entries=await adb.list('serial','/parent/sub');
   assert.equal(entries.find(e=>e.name==='restricted').unknown,true);
   assert.equal(entries.find(e=>e.name==='.hidden').unknown,false);
@@ -89,6 +90,11 @@ test('batch directory metadata preserves inaccessible, hidden and special entrie
 });
 
 test('relative links inside aliased directory use its physical parent',async()=>{
-  const adb=new c.Adb(()=> 'adb');adb.exec=async()=>['P','/real/nested','','lrwxrwxrwx','link','../file'].join('\0')+'\0';
+  const adb=new c.Adb(()=> 'adb');adb.exec=async()=>metadata(['P','/real/nested','','lrwxrwxrwx','link','../file']);
   assert.equal((await adb.list('serial','/alias'))[0].target,'/real/file');
+});
+
+test('file metadata includes size and modified time without content transfer',async()=>{
+ const adb=new c.Adb(()=> 'adb');adb.exec=async()=>['-rw-r--r--','sample.txt','','2048','1700000000.5'].join('\0')+'\0';
+ const item=(await adb.list('serial','/tmp'))[0];assert.equal(item.size,2048);assert.equal(item.modified,1700000000500);assert.equal(c.formatSize(item.size),'2.0 KB');
 });

@@ -9,6 +9,7 @@
 - `package.json`：扩展入口、命令、图标、菜单、设置和版本。
 - `src/extension.js`：设备/文件树、目录缓存、原生 Gradle 项目与应用操作、命令注册。
 - `src/core.js`：ADB 调用、路径校验、目录元数据、项目发现、APK 元数据、日志解析和过滤。
+- `src/log-query.js`：Studio 风格查询解析和匹配，不执行用户输入代码。
 - `src/logcat.js`：Logcat Webview 生命周期、实时/离线日志、过滤历史及采集操作。
 - `src/capture.js`：截屏、录屏进程与安全保存。
 - `media/logcat.js`、`media/logcat.css`：Webview 交互和样式。
