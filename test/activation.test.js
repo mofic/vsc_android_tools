@@ -57,6 +57,16 @@ test('activates every contributed command and tree, then disposes timers', async
     await commands.get('androidTools.appSettings')();assert.match(errors.pop(),/Activity not found/);
     Adb.prototype.exec=settingsExec;
 
+    const savedProject=state.get('project');
+    for(const [id,action] of Object.entries({dateSettings:'DATE_SETTINGS',languageSettings:'LOCALE_SETTINGS',developerSettings:'APPLICATION_DEVELOPMENT_SETTINGS'})) {
+      await commands.get('androidTools.'+id)();
+      assert.ok(calls.some(call=>call.serial==='serial'&&call.args?.[1] === "'am' 'start' '-W' '-a' 'android.settings."+action+"'"));
+    }
+    assert.equal(state.get('project'),savedProject);
+    Adb.prototype.exec=async()=> 'Error: Activity not found';
+    await commands.get('androidTools.developerSettings')();assert.match(errors.pop(),/Activity not found/);
+    Adb.prototype.exec=settingsExec;
+
     const listCount = () => calls.filter(call=>call.args?.[0]==='shell').length;
     const beforeListing = listCount();
     const [children] = await Promise.all([trees.get('androidFiles').getChildren(), trees.get('androidFiles').getChildren()]);

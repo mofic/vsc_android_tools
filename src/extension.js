@@ -262,10 +262,20 @@ function activate(ctx) {
   }
   handlers.appSettings = async () => {
     trust(); const serial = await device(), packageId = await pkg(); if (!packageId) return;
-    const result = await adb.shell(serial, ['am', 'start', '-W', '-a', 'android.settings.APPLICATION_DETAILS_SETTINGS', '-d', 'package:' + packageId]);
+    await openSettings(serial, 'android.settings.APPLICATION_DETAILS_SETTINGS', 'package:' + packageId);
+  };
+  for (const [id, action] of Object.entries({
+    dateSettings: 'android.settings.DATE_SETTINGS',
+    languageSettings: 'android.settings.LOCALE_SETTINGS',
+    developerSettings: 'android.settings.APPLICATION_DEVELOPMENT_SETTINGS'
+  })) handlers[id] = async () => { trust(); await openSettings(await device(), action); };
+  async function openSettings(serial, action, data) {
+    const args = ['am', 'start', '-W', '-a', action];
+    if (data) args.push('-d', data);
+    const result = await adb.shell(serial, args);
     if (/Error:|Exception/.test(result)) throw new Error(result);
     output.appendLine(result);
-  };
+  }
   handlers.launch = async () => { trust(); const serial = await device(), packageId = await pkg(); if (packageId) await launch(serial, packageId); };
   for (const directory of [false, true]) handlers[directory ? 'newFolder' : 'newFile'] = async item => {
     trust(); const t = await target(item); const name = await v.window.showInputBox({ prompt: directory ? '文件夹名称' : '文件名称' }); if (!name) return;

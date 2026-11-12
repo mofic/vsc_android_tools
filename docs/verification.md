@@ -96,3 +96,9 @@
 - 项目应用面板新增“应用设置”，命令面板新增“打开应用设置”。复用设备选择、当前包名校验及工作区信任检查，使用 android.settings.APPLICATION_DETAILS_SETTINGS 和 package URI 打开系统详情页。
 - npm test 26 项和 npm run check 通过。测试验证按钮白名单、目标设备/包名及 Activity 启动错误反馈；本次未做真机界面验证。
 - 安装包在临时目录生成并在安装后清理，仓库不保留 VSIX。
+
+## 0.2.5 系统设置快捷入口（2026-11-12）
+
+- 项目应用面板增加时间设置、语言设置（系统语言列表）、开发者选项，均仅依赖所选设备。复用应用设置的启动和错误反馈逻辑，不修改系统配置。
+- npm test 26 项、npm run check、git diff --check 通过；验证三个按钮的命令白名单、Intent 与设备绑定，以及启动失败反馈。
+- 在 Pixel 4a 上通过 cmd package resolve-activity 只读确认 DATE_SETTINGS、LOCALE_SETTINGS、APPLICATION_DEVELOPMENT_SETTINGS 均解析到系统 Settings Activity，未做页面交互验证。
