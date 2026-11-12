@@ -6,7 +6,7 @@ test('project app panel exposes all operations, updates targets and rejects unkn
  Module._load=function(id,...args){return id==='vscode'?mock:original.call(this,id,...args)};
  try{
   const {registerAppView,actions}=require('../src/app-view');
-  assert.deepEqual(Object.keys(actions).slice(3),['build','clearDataAndRun','launch','stop','clearData','uninstall','revoke']);
+  assert.deepEqual(Object.keys(actions).slice(3),['build','clearDataAndRun','launch','stop','clearData','uninstall','revoke','appSettings']);
   assert.equal(actions.build,'运行');
   const update=registerAppView({subscriptions,extensionUri:'test'},()=>state,async id=>{executed.push(id);await new Promise(resolve=>{finish=resolve;});});
   const view={webview:{cspSource:'test',asWebviewUri:x=>x,postMessage:m=>messages.push(m),onDidReceiveMessage:fn=>{receive=fn;return{dispose(){}};}},onDidDispose:()=>({dispose(){}})};

@@ -260,6 +260,12 @@ function activate(ctx) {
       const result = await adb.shell(serial, [...command, packageId]); if (/Failure|Failed|Error:|Exception/.test(result)) throw new Error(result); output.appendLine(result); v.window.showInformationMessage(`${id} 完成：${packageId}`);
     };
   }
+  handlers.appSettings = async () => {
+    trust(); const serial = await device(), packageId = await pkg(); if (!packageId) return;
+    const result = await adb.shell(serial, ['am', 'start', '-W', '-a', 'android.settings.APPLICATION_DETAILS_SETTINGS', '-d', 'package:' + packageId]);
+    if (/Error:|Exception/.test(result)) throw new Error(result);
+    output.appendLine(result);
+  };
   handlers.launch = async () => { trust(); const serial = await device(), packageId = await pkg(); if (packageId) await launch(serial, packageId); };
   for (const directory of [false, true]) handlers[directory ? 'newFolder' : 'newFile'] = async item => {
     trust(); const t = await target(item); const name = await v.window.showInputBox({ prompt: directory ? '文件夹名称' : '文件名称' }); if (!name) return;

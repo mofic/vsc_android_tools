@@ -4,7 +4,7 @@ const { randomBytes } = require('node:crypto');
 const actions = {
   selectDevice:'选择设备', selectProject:'选择项目', selectPackage:'确认／切换包名',
   build:'运行', clearDataAndRun:'清除数据并运行', launch:'启动', stop:'停止',
-  clearData:'清除数据', uninstall:'卸载', revoke:'撤销权限'
+  clearData:'清除数据', uninstall:'卸载', revoke:'撤销权限', appSettings:'应用设置'
 };
 function registerAppView(ctx, getState, execute) {
   let view, busy = false;
