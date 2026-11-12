@@ -5,7 +5,7 @@ VS Code 安卓设备管理插件，支持原生 Android Gradle 项目和多根�
 ## 安装与运行
 
 1. 安装 Android SDK Platform Tools，在终端确认 `adb devices -l` 能看到已授权设备。
-2. 在 VS Code 执行 **Extensions: Install from VSIX…**，选择本仓库生成的 `android-device-tools-0.2.11.vsix`。
+2. 在 VS Code 执行 **Extensions: Install from VSIX…**，选择本仓库生成的 `android-device-tools-0.2.12.vsix`。
 3. 打开左侧 Android Tools 图标，点击设备选中目标。ADB 不在 PATH 时设置 `androidTools.adbPath`。
 4. 使用命令面板搜索 `Android Tools` 执行应用和文件操作；文件树提供右键菜单。
 
@@ -53,7 +53,7 @@ is:crash
 
 支持 `package`、`process`、`tag`、`message`、`line`、`level`、`age`、`is`、`name`。`package:mine` 使用当前所选项目的 applicationId，缺少时会引导选择；离线日志不支持它。`-tag:` 等否定和 `tag~:` 等正则可用于文本字段；带空格或正则括号/运算符的值请加引号。支持 `&`、`|` 和括号，AND 优先于 OR；空格默认为 AND，同一隐式条件组内重复正向字段默认 OR。该规则是明确限定的 Studio 风格子集，不承诺所有 Studio 查询语法完全兼容。`age` 使用主机时间及日志中推断的年份，历史导入或设备时钟不同可能影响结果。`is:crash` / `is:stacktrace` 为文本特征匹配。
 
-过滤统一在查询输入框完成，例如 `package:mine tag:App level:ERROR message~:"timeout|failed"`。输入框下拉列表合并收藏与最近查询，收藏置顶；点击行右侧 ☆ 收藏，点击 ★ 取消收藏，点击配置文字直接应用。最近查询与收藏各保留 20 条；旧版独立字段配置不再显示。无效查询会标记错误并保留上次有效过滤。
+过滤框旁的问号可查看语法帮助；下拉语法建议带中文说明，点击后补到现有查询末尾，不会自动应用。过滤统一在查询输入框完成，例如 `package:mine tag:App level:ERROR message~:"timeout|failed"`。输入框下拉列表合并收藏与最近查询，收藏置顶；点击行右侧 ☆ 收藏，点击 ★ 取消收藏，点击配置文字直接应用。最近查询与收藏各保留 20 条；旧版独立字段配置不再显示。无效查询会标记错误并保留上次有效过滤。
 
 标准 threadtime 日志按时间、PID:TID、包名/进程、级别、Tag、消息分列。工具栏“精简”隐藏时间和 PID 列，窄窗口自动精简；普通文本日志按原文展示。新日志增量追加，缓冲淘汰时复用仍保留的行，避免重绘打断选区。向上滚动或选择日志解除跟随，滚到末尾或点击“回到最新日志”恢复；暂停时显示新增条数。搜索保持独立，重连保留当前过滤、换行和视图选项。
 

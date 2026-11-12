@@ -29,6 +29,11 @@ test('history dropdown restores configuration and keeps editor fields synchroniz
   element('wrap').checked=false;element('wrap').listeners.change();assert.equal(element('logs').style.whiteSpace,'pre');
   element('wrap').checked=true;element('wrap').listeners.change();assert.equal(element('logs').style.whiteSpace,'pre-wrap');
   receive({data:{type:'paused',value:true,pending:6}});assert.match(element('pauseStatus').textContent,/新增 6/);
+  const hint=popup.children.find(row=>row.className==='query-hint'&&row.textContent.startsWith('level:ERROR'));
+  element('query').value='package:mine';const beforeHint=sent.length;hint.listeners.click();
+  assert.equal(element('query').value,'package:mine level:ERROR');assert.equal(sent.length,beforeHint);
+  element('query').value='package:mine level:';hint.listeners.click();assert.equal(element('query').value,'package:mine level:ERROR');
+  element('query').value=filter.query;
   element('apply').listeners.click();assert.equal(sent.at(-1).type,'filter');assert.equal(sent.at(-1).filter.query,filter.query);
   assert.equal(popup.children[0].children[0].textContent,'Errors');
 });

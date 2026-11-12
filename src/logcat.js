@@ -31,6 +31,7 @@ async function importLogcat(ctx, adb, error) {
   return openLogcat(ctx, adb, undefined, error, source);
 }
 const icons = {
+  help: '<circle cx="12" cy="12" r="9"/><path d="M9.5 9a2.5 2.5 0 1 1 4 2c-1.5 1-1.5 1.5-1.5 3m0 3h.01"/>',
   newTab: '<path d="M3 7h7l2-3h9v16H3Z"/><path d="M8 13h8m-4-4v8"/>',
   apply: '<path d="m4 12 5 5L20 6"/>', filters: '<path d="M4 7h16M4 17h16M9 4v6m6 4v6"/>',
   pause: '<path class="idle-icon" d="M8 5v14M16 5v14"/><path class="active-icon" d="m8 5 11 7-11 7Z"/>',
@@ -50,6 +51,21 @@ function openLogcat(ctx, adb, serial, error, source, column = v.ViewColumn.Activ
   panel.webview.html = `<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${panel.webview.cspSource}; script-src 'nonce-${nonce}'"><link rel="stylesheet" href="${style}"></head><body><header class="toolbar" aria-label="Logcat 工具栏">
 <div class="keyword"><input id="query" placeholder="package:mine level:ERROR  或输入关键词…" aria-label="Logcat 查询" maxlength="2000" autocomplete="off" aria-controls="querySuggestions" aria-expanded="false" aria-haspopup="dialog"><button id="queryToggle" class="query-toggle" title="收藏和最近过滤配置" aria-label="收藏和最近过滤配置" aria-expanded="false" aria-controls="querySuggestions">▾</button><div id="querySuggestions" class="query-suggestions" role="dialog" aria-label="过滤配置" hidden></div></div>
 ${iconButton('apply', '应用过滤（Enter）', 'apply')}
+<details id="syntaxHelp" class="popover"><summary title="过滤语法帮助" aria-label="过滤语法帮助">${icon('help')}</summary><div class="syntax-help">
+<strong>过滤语法</strong><p>输入条件后按 Enter 应用；普通文字匹配整行日志，不区分大小写。</p>
+<dl><dt><code>package:mine</code></dt><dd>当前项目应用及子进程（需要连接设备）</dd>
+<dt><code>package:com.example.app</code></dt><dd>按包名包含匹配</dd>
+<dt><code>tag:AllPushManager</code></dt><dd>按日志 Tag 包含匹配</dd>
+<dt><code>message:"request failed"</code></dt><dd>消息含空格时使用引号</dd>
+<dt><code>level:ERROR</code></dt><dd>ERROR 及以上；支持 VERBOSE / DEBUG / INFO / WARN / ERROR / ASSERT</dd>
+<dt><code>process:com.example.app:remote</code></dt><dd>按进程名包含匹配</dd>
+<dt><code>-tag:Noise</code></dt><dd>排除指定 Tag；其他字段也可加减号排除</dd>
+<dt><code>message~:"timeout|failed"</code></dt><dd>字段后加 ~ 使用正则，支持 tag / package / process / message / line</dd>
+<dt><code>age:5m</code></dt><dd>最近 5 分钟；单位 s / m / h / d</dd>
+<dt><code>is:crash</code> / <code>is:stacktrace</code></dt><dd>崩溃相关日志 / 异常堆栈行</dd></dl>
+<p>不同字段用空格表示同时满足；同字段重复条件表示任一满足。用 <code>&amp;</code> 强制同时满足，<code>|</code> 表示任一满足，括号用于分组。</p>
+<code>package:mine (tag:Network | tag:Http) level:WARN</code>
+</div></details>
 <span class="separator" aria-hidden="true"></span>
 ${iconButton('pause', '暂停日志显示', 'pause', `${offline} aria-pressed="false"`)}
 <label class="scroll-toggle" title="自动滚动到最新日志"><input id="scroll" type="checkbox" checked>跟随</label><label class="scroll-toggle" title="自动换行；关闭后单行显示并支持横向滚动"><input id="wrap" type="checkbox" checked>换行</label><label class="scroll-toggle" title="隐藏时间和 PID/TID 列；窄窗口会自动精简"><input id="compact" type="checkbox">精简</label>

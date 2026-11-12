@@ -23,7 +23,7 @@ input,select{color:var(--vscode-input-foreground);background:var(--vscode-input-
 .popover{position:relative;flex-shrink:0}
 .popover>summary{list-style:none}
 .popover>summary::-webkit-details-marker{display:none}
-.more-menu{position:fixed;right:8px;top:34px;z-index:20;padding:8px;border:1px solid var(--vscode-widget-border,var(--vscode-panel-border));border-radius:4px;box-shadow:0 4px 12px var(--vscode-widget-shadow,#0005);background:var(--vscode-menu-background,var(--vscode-editor-background));color:var(--vscode-menu-foreground,var(--vscode-foreground))}
+.syntax-help,.more-menu{position:fixed;right:8px;top:34px;z-index:20;padding:8px;border:1px solid var(--vscode-widget-border,var(--vscode-panel-border));border-radius:4px;box-shadow:0 4px 12px var(--vscode-widget-shadow,#0005);background:var(--vscode-menu-background,var(--vscode-editor-background));color:var(--vscode-menu-foreground,var(--vscode-foreground))}
 
 
 
@@ -53,3 +53,5 @@ footer{display:flex;gap:12px;align-items:center}#packageStatus{max-width:55%;ove
 #query[aria-invalid=true]{outline:1px solid var(--vscode-inputValidation-errorBorder)}@media(max-width:600px){.log-time,.log-pid{display:none}.log-row{grid-template-columns:minmax(80px,140px) 22px minmax(50px,100px) minmax(0,1fr)}}
 
 .keyword #query{padding-right:28px}.query-toggle{position:absolute;right:1px;top:1px;height:24px;width:26px;border:0;background:transparent;color:var(--vscode-input-foreground)}.query-suggestions{position:absolute;top:calc(100% + 2px);left:0;right:0;z-index:30;max-height: min(360px,65vh);overflow:auto;padding:3px;background:var(--vscode-dropdown-background);color:var(--vscode-dropdown-foreground);border:1px solid var(--vscode-dropdown-border,var(--vscode-widget-border));box-shadow:0 4px 12px var(--vscode-widget-shadow)}.query-option{display:flex;align-items:stretch}.query-suggestions button{border:0;border-radius:2px;background:transparent;color:inherit;min-height:26px;text-align:left}.query-choice{flex:1;min-width:0;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;padding:4px 6px}.query-star{flex:0 0 28px;text-align:center!important;font-size:16px}.query-star[aria-pressed=true]{color:var(--vscode-editorWarning-foreground)}.query-hint{display:block;width:100%;padding:4px 6px;color:var(--vscode-descriptionForeground)!important}.query-suggestions button:hover{background:var(--vscode-list-hoverBackground)}
+
+.syntax-help{box-sizing:border-box;width:min(460px,calc(100vw - 16px));max-height:70vh;overflow:auto;line-height:1.6}.syntax-help p{margin:6px 0 10px}.syntax-help dl{margin:0}.syntax-help dt{margin-top:8px}.syntax-help dd{margin:1px 0 0;color:var(--vscode-descriptionForeground)}.syntax-help code{font-family:var(--vscode-editor-font-family,monospace);overflow-wrap:anywhere}.query-hint{white-space:normal;overflow-wrap:anywhere}

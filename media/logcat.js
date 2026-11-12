@@ -33,10 +33,23 @@ function renderSuggestions() {
   for (const item of favoriteFilters) add(item.filter,item.name);
   add(current);
   for (const filter of recentFilters) add(filter);
-  for (const query of ['package:mine','level:ERROR','tag:','message:','process:','-tag:','age:5m','is:crash','is:stacktrace']) {
-    const row = document.createElement('button'); row.className = 'query-hint'; row.textContent = query;
+  const hints = [
+    ['package:mine','当前应用及子进程'], ['level:ERROR','错误及以上'],
+    ['tag:App','按 Tag 过滤'], ['message:"request failed"','按消息过滤，空格加引号'],
+    ['process:remote','按进程名过滤'], ['-tag:Noise','排除 Tag'],
+    ['message~:"timeout|failed"','消息正则匹配'], ['age:5m','最近 5 分钟'],
+    ['is:crash','崩溃日志'], ['is:stacktrace','异常堆栈']
+  ];
+  for (const [query,description] of hints) {
+    const row = document.createElement('button'); row.className = 'query-hint'; row.textContent = query + ' — ' + description;
+    row.title = '补到当前查询末尾，不会自动应用';
     if (seen.has(filterKey({...current,query}))) continue;
-    row.addEventListener('click', () => { byId('query').value = query; byId('query').focus(); showSuggestions(false); });
+    row.addEventListener('click', () => {
+      const input = byId('query'), value = input.value.trimEnd();
+      const incomplete = value.match(/(?:^|\s)(-?[a-z]+~?:)$/i);
+      input.value = incomplete && query.startsWith(incomplete[1]) ? value.slice(0,-incomplete[1].length) + query : [value,query].filter(Boolean).join(' ');
+      input.focus(); showSuggestions(false);
+    });
     popup.append(row);
   }
   focusStar?.focus();
@@ -166,24 +179,27 @@ byId('findText').addEventListener('keydown', event => {
 window.addEventListener('keydown', event => {
   if (event.key === 'Escape') {
     showSuggestions(false);
-    for (const id of ['more']) if (byId(id).open) { byId(id).open = false; byId(id).querySelector('summary').focus(); }
+    for (const id of ['more','syntaxHelp']) if (byId(id).open) { byId(id).open = false; byId(id).querySelector('summary').focus(); }
     if (!byId('searchbar').hidden) showSearch(false);
   }
   if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'f') { event.preventDefault(); showSearch(true); }
 });
-for (const id of ['more']) byId(id).addEventListener('toggle', () => {
+for (const id of ['more','syntaxHelp']) byId(id).addEventListener('toggle', () => {
   const details = byId(id); if (!details.open) return;
+  byId(id === 'more' ? 'syntaxHelp' : 'more').open = false;
+  showSuggestions(false);
   const panel = details.querySelector('div'), anchor = details.querySelector('summary').getBoundingClientRect();
   panel.style.left = Math.max(8, Math.min(anchor.right - panel.offsetWidth, window.innerWidth - panel.offsetWidth - 8)) + 'px';
   panel.style.top = document.querySelector('header').getBoundingClientRect().bottom + 4 + 'px';
 });
 window.addEventListener('resize', () => {
   showSuggestions(false);
-  for (const id of ['more']) { byId(id).open = false; byId(id).querySelector('div').style.left = ''; }
+  for (const id of ['more','syntaxHelp']) { byId(id).open = false; byId(id).querySelector('div').style.left = ''; }
 });
 window.addEventListener('click', event => {
   if (!event.target.closest('.keyword')) showSuggestions(false);
   if (!event.target.closest('#more')) byId('more').open = false;
+  if (!event.target.closest('#syntaxHelp')) byId('syntaxHelp').open = false;
 });
 window.addEventListener('message', ({ data }) => {
   if (data.type === 'history') {
