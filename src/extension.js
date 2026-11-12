@@ -21,7 +21,7 @@ function activate(ctx) {
   const directoryCache = new Map();
   function updateFileHeader() {
     updateAppView();
-    if (filesView) { filesView.description = selected || ''; filesView.message = selected ? root : '请选择已授权设备'; }
+    if (filesView) { filesView.description = selected ? selected + (adb.fileRoots.has(selected) ? ' · ROOT' : '') : ''; filesView.message = selected ? root : '请选择已授权设备'; }
   }
   function refreshFiles(item) {
     if (item) directoryCache.delete(`${item.serial}:${item.target || item.remote}`); else directoryCache.clear();
@@ -50,6 +50,7 @@ function activate(ctx) {
   }
   async function refreshDevices() {
     const next = c.devices(await adb.exec(null, ['devices', '-l']));
+    for (const serial of adb.fileRoots.keys()) if (!next.some(d => d.serial === serial && d.state === 'device')) adb.fileRoots.delete(serial);
     if (selected && !next.some(d => d.serial === selected && d.state === 'device')) { selected = undefined; updateFileHeader(); status.text = '$(device-mobile) Android: 已断开'; refreshFiles(); }
     if (JSON.stringify(next) !== JSON.stringify(deviceList)) { deviceList = next; deviceEvent.fire(); }
   }
@@ -158,9 +159,10 @@ function activate(ctx) {
     refreshDirectory: async item => { const t = await target(item); if (t.directory) refreshFiles(t); else refreshParent(t); },
     openAppDirectory: async () => {
       const serial = await device(), packageId = await currentPackage(); if (!packageId) return;
-      const directory = `/sdcard/Android/data/${packageId}`;
+      await adb.enableFileRoot(serial); directoryCache.clear(); updateFileHeader();
+      const directory = `/data/data/${packageId}`;
       try { await readDirectory(serial, directory); }
-      catch (e) { throw new Error(`目录不存在或无权访问：${serial}:${directory}。请确认该变体已安装并创建了外部存储目录。${e.message}`); }
+      catch (e) { throw new Error(`目录不存在或无权访问：${serial}:${directory}。请确认该变体已安装，且 Root 授权有效。${e.message}`); }
       await navigate(directory); await v.commands.executeCommand('androidFiles.focus');
     },
     browse: async () => { await device(); const value = await v.window.showInputBox({ value: root, prompt: '设备绝对路径' }); if (value) await navigate(value) },
@@ -174,7 +176,7 @@ function activate(ctx) {
           const temp = await fs.mkdtemp(path.join(os.tmpdir(), 'android-tools-'));
           const file = path.join(temp, c.filename(path.posix.basename(remote)));
           try {
-            await progress(`打开 ${t.serial}:${remote}`, opts => adb.exec(t.serial, ['pull', remote, file], opts));
+            await progress(`打开 ${t.serial}:${remote}`, opts => adb.pullFile(t.serial, remote, file, opts));
             edited.set(file, { ...t, remote, temp, needsUpload: false }); return file;
           } catch (e) { await fs.rm(temp, { recursive: true, force: true }); throw e; }
         })());
@@ -188,22 +190,22 @@ function activate(ctx) {
       if (!await confirm(`覆盖 ${t.serial}:${t.remote}？`)) return;
       if (!await doc.save()) throw new Error('本地保存失败');
       const version = doc.version;
-      await progress('保存到设备', opts => adb.exec(t.serial, ['push', doc.uri.fsPath, t.remote], opts));
+      await progress('保存到设备', opts => adb.pushFile(t.serial, doc.uri.fsPath, t.remote, opts));
       t.needsUpload = doc.version !== version; updateEditStatus(); refreshParent(t); v.window.showInformationMessage(t.needsUpload ? `此版本已上传，后续修改仍待同步：${t.serial}:${t.remote}` : `已同步到 ${t.serial}:${t.remote}`);
     },
     rename: async item => { trust(); if (!item?.remote) throw new Error('请右键选择文件或目录'); const t = await target(item); const name = await v.window.showInputBox({ value: path.posix.basename(t.remote), prompt: '新名称（目标存在时禁止覆盖）' }); if (!name) return;
       const dest = path.posix.join(path.posix.dirname(t.remote), c.filename(name));
-      await adb.exec(t.serial, ['shell', `if [ -e ${c.quote(dest)} ] || [ -L ${c.quote(dest)} ]; then echo '目标已存在' >&2; exit 1; fi; mv -- ${c.quote(c.remotePath(t.remote))} ${c.quote(dest)}`]);
+      await adb.fileScript(t.serial, `if [ -e ${c.quote(dest)} ] || [ -L ${c.quote(dest)} ]; then echo '目标已存在' >&2; exit 1; fi; mv -- ${c.quote(c.remotePath(t.remote))} ${c.quote(dest)}`);
       if (!t.symlink) for (const entry of edited.values()) if (entry.serial === t.serial && (entry.remote === t.remote || entry.remote.startsWith(t.remote + '/'))) { entry.remote = dest + entry.remote.slice(t.remote.length); entry.parentNode = undefined; }
       updateEditStatus(); refreshParent(t); },
-    delete: async item => { trust(); if (!item?.remote) throw new Error('请右键选择文件或目录'); const t = await target(item); if (['/', '/sdcard', '/storage', '/data'].includes(c.remotePath(t.remote))) throw new Error('禁止删除根目录'); if (await confirm(`永久删除 ${t.serial}:${t.remote} 及其内容？`)) { await adb.shell(t.serial, ['rm', '-rf', '--', t.remote]); refreshParent(t); } },
+    delete: async item => { trust(); if (!item?.remote) throw new Error('请右键选择文件或目录'); const t = await target(item); if ((['/', '/sdcard', '/storage', '/data', '/data/data', '/data/user', '/data/user_de'].includes(c.remotePath(t.remote)) || /^\/data\/(user|user_de)\/\d+$/.test(c.remotePath(t.remote)))) throw new Error('禁止删除根目录'); if (await confirm(`永久删除 ${t.serial}:${t.remote} 及其内容？`)) { await adb.fileShell(t.serial, ['rm', '-rf', '--', t.remote]); refreshParent(t); } },
     download: async item => {
       const t = await target(item);
       const dest = t.directory ? (await v.window.showOpenDialog({ canSelectFolders: true, canSelectFiles: false }))?.[0] : await v.window.showSaveDialog({ title: `另存为 · ${t.serial}:${t.remote}`, defaultUri: v.Uri.file(path.join(os.homedir(),path.posix.basename(t.remote))) });
       if (!dest) return; if (dest.scheme !== 'file') throw new Error('请选择本地保存路径');
       const local = t.directory ? path.join(dest.fsPath, path.posix.basename(t.remote)) : dest.fsPath;
       if (t.directory) { try { await fs.access(local); if (!await confirm(`本地 ${local} 已存在，合并目录并覆盖同名文件？`)) return; } catch(e) { if (e.code !== 'ENOENT') throw e; } }
-      await progress(`下载 ${t.serial}:${t.remote}`, opts => adb.exec(t.serial, ['pull', t.remote, dest.fsPath], opts)); v.window.showInformationMessage(`已下载到 ${dest.fsPath}`);
+      await progress(`下载 ${t.serial}:${t.remote}`, opts => adb.pullFile(t.serial, t.remote, dest.fsPath, opts)); v.window.showInformationMessage(`已下载到 ${dest.fsPath}`);
     },
     build: async () => {
       trust(); const serial = await device(), p = await getProject();
@@ -255,13 +257,13 @@ function activate(ctx) {
   for (const directory of [false, true]) handlers[directory ? 'newFolder' : 'newFile'] = async item => {
     trust(); const t = await target(item); const name = await v.window.showInputBox({ prompt: directory ? '文件夹名称' : '文件名称' }); if (!name) return;
     const dest = path.posix.join(t.directory ? t.remote : path.posix.dirname(t.remote), c.filename(name));
-    await adb.exec(t.serial, ['shell', `if [ -e ${c.quote(dest)} ] || [ -L ${c.quote(dest)} ]; then echo '目标已存在' >&2; exit 1; fi; ${directory ? 'mkdir --' : 'touch --'} ${c.quote(dest)}`]); if (t.directory) refreshFiles(t); else refreshParent(t);
+    await adb.createFile(t.serial, dest, directory); if (t.directory) refreshFiles(t); else refreshParent(t);
   };
   for (const folder of [false, true]) handlers[folder ? 'uploadFolder' : 'upload'] = async item => {
     trust(); const t = await target(item), dir = t.directory ? t.remote : path.posix.dirname(t.remote);
     const sources = await v.window.showOpenDialog({ canSelectFolders: folder, canSelectFiles: !folder, canSelectMany: true }); if (!sources) return;
     if (!await confirm(`上传至 ${t.serial}:${dir}，合并目录并覆盖同名文件？`)) return;
-    await progress('上传到设备', async opts => { for (const source of sources) await adb.exec(t.serial, ['push', source.fsPath, dir + '/'], opts); }); if (t.directory) refreshFiles(t); else refreshParent(t); v.window.showInformationMessage(`上传完成：${t.serial}:${dir}`);
+    await progress('上传到设备', async opts => { for (const source of sources) await adb.pushFile(t.serial, source.fsPath, dir + '/', opts); }); if (t.directory) refreshFiles(t); else refreshParent(t); v.window.showInformationMessage(`上传完成：${t.serial}:${dir}`);
   };
   for (const [id, handler] of Object.entries(handlers)) ctx.subscriptions.push(v.commands.registerCommand(`androidTools.${id}`, (...args) => Promise.resolve().then(() => handler(...args)).catch(e => { error(e); }).finally(() => updateAppView())));
   ctx.subscriptions.push(v.window.registerTreeDataProvider('androidDevices', devicesProvider), filesView = v.window.createTreeView('androidFiles', { treeDataProvider: filesProvider, showCollapseAll: true }), output, status, deviceEvent, fileEvent);

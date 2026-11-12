@@ -27,6 +27,7 @@ test('activates every contributed command and tree, then disposes timers', async
   Adb.prototype.exec=async(serial,args)=> {
     if (args[0] === 'devices') return 'List of devices attached\nserial device model:Pixel\n';
     calls.push({ serial, args });
+    if (args[0] === 'shell' && args[1] === "'id' '-u'") return '0\n';
     if (inaccessible) throw new Error('Permission denied');
     if (args[0] === 'pull') { await fs.writeFile(args[2], 'target content'); return ''; }
     return metadata(['drwxr-xr-x','files','','drwxr-xr-x','sdcard','/storage/emulated/0','-rw-r--r--','alias','/real.txt']);
@@ -65,12 +66,12 @@ test('activates every contributed command and tree, then disposes timers', async
     const parentItem = trees.get('androidFiles').getTreeItem(children[0]);
     assert.equal(parentItem.command.command, 'androidTools.goParent');
     assert.equal(parentItem.contextValue, 'androidParent');
-    assert.equal(children.find(f=>f.name==='files').remote, '/sdcard/Android/data/com.example.debug/files');
+    assert.equal(children.find(f=>f.name==='files').remote, '/data/data/com.example.debug/files');
     assert.equal(children[0].serial, 'serial');
     await commands.get(parentItem.command.command)();
     const upper = await trees.get('androidFiles').getChildren();
-    assert.equal(upper.find(f=>f.name==='files').remote, '/sdcard/Android/data/files');
-    await commands.get('androidTools.goBack')();assert.equal((await trees.get('androidFiles').getChildren()).find(f=>f.name==='files').remote, '/sdcard/Android/data/com.example.debug/files');
+    assert.equal(upper.find(f=>f.name==='files').remote, '/data/data/files');
+    await commands.get('androidTools.goBack')();assert.equal((await trees.get('androidFiles').getChildren()).find(f=>f.name==='files').remote, '/data/data/com.example.debug/files');
     await commands.get('androidTools.goForward')();
     for (let i=0;i<5;i++) await commands.get('androidTools.goParent')();
     const atRoot = await trees.get('androidFiles').getChildren();

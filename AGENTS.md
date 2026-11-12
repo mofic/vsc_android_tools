@@ -10,12 +10,13 @@
 - `src/app-view.js`、`media/app.js`、`media/app.css`：项目应用侧栏，显示目标并通过白名单复用命令。
 - `src/extension.js`：设备/文件树、目录缓存、原生 Gradle 项目与应用操作、命令注册。
 - `src/core.js`：ADB 调用、路径校验、目录元数据、项目发现、APK 元数据、日志解析和过滤。
+- `src/root-files.js`：Root 私有文件传输及权限保留；`src/remote-path.js`：路径和 shell 参数校验。
 - `src/log-query.js`：Studio 风格查询解析和匹配，不执行用户输入代码。
 - `src/logcat.js`：Logcat Webview 生命周期、实时/离线日志、过滤历史及采集操作。
 - `src/capture.js`：截屏、录屏进程与安全保存。
 - `media/logcat.js`、`media/logcat.css`：Webview 交互和样式。
 - `test/*.test.js`：自动化测试；`test/host.cjs`：真实 Extension Host 验证入口。
-- `test/device-smoke.js`、`test/capture-smoke.js`：需明确指定设备的手动真机验证脚本。
+- `test/device-smoke.js`、`test/root-smoke.js`、`test/capture-smoke.js`：需明确指定设备的手动真机验证脚本。
 - `README.md`：使用方式与功能边界；`docs/verification.md`：历史验证记录。
 
 ## 修改原则

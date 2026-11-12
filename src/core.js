@@ -3,15 +3,8 @@ const fs = require('node:fs/promises');
 const path = require('node:path');
 const { spawn } = require('node:child_process');
 const { compileQuery } = require('./log-query');
-function quote(value) { return "'" + String(value).replace(/'/g, "'\\''") + "'"; }
-function remotePath(value) {
-  if (typeof value !== 'string' || !value.startsWith('/') || /[\x00-\x1f\x7f]/.test(value) || value.split('/').includes('..')) throw new Error('设备路径必须是绝对路径，且不含 .. 或控制字符');
-  return path.posix.normalize(value);
-}
-function filename(value) {
-  if (!value || value === '.' || value === '..' || /[/\x00-\x1f\x7f]/.test(value)) throw new Error('无效文件名');
-  return value;
-}
+const { quote, remotePath, filename } = require('./remote-path');
+const rootFiles = require('./root-files');
 function devices(output) {
   return output.split(/\r?\n/).slice(1).filter(x => x.trim()).map(line => {
     const [serial, state, ...info] = line.trim().split(/\s+/);
@@ -34,9 +27,25 @@ function run(binary, args, options = {}) {
   });
 }
 class Adb {
-  constructor(binary) { this.binary = binary; }
+  constructor(binary) { this.binary = binary; this.fileRoots = new Map(); }
   exec(serial, args, options) { return run(this.binary(), serial ? ['-s', serial, ...args] : args, options); }
   shell(serial, args, options) { return this.exec(serial, ['shell', args.map(quote).join(' ')], options); }
+  async enableFileRoot(serial) {
+    this.fileRoots.delete(serial);
+    const uid = (await this.shell(serial,['id','-u'],{timeout:15000})).trim();
+    if (!/^\d+$/.test(uid)) throw new Error('无法识别 ADB shell 身份');
+    if (uid === '0') { this.fileRoots.set(serial,{kind:'adbd',uid}); return; }
+    let result;
+    try { result = (await this.shell(serial,['su','-c','id -u'],{timeout:15000})).trim(); }
+    catch(e) { throw new Error(`当前应用私有目录需要 Root，请在设备上授权 ADB shell 使用 su。${e.message}`); }
+    if (result !== '0') throw new Error('未获得 Root 权限，不能打开应用私有目录');
+    this.fileRoots.set(serial,{kind:'su',uid});
+  }
+  fileScript(serial, script, options) { return this.exec(serial,['shell',this.fileRoots.get(serial)?.kind === 'su' ? `su -c ${quote(script)}` : script],options); }
+  fileShell(serial, args, options) { return this.fileScript(serial,args.map(quote).join(' '),options); }
+  pullFile(serial, remote, local, options) { return rootFiles.pull(this,serial,remote,local,options); }
+  pushFile(serial, local, remote, options) { return rootFiles.push(this,serial,local,remote,options); }
+  createFile(serial, remote, directory) { return rootFiles.create(this,serial,remote,directory); }
   async list(serial, dir) {
     const directory = remotePath(dir);
     // Android mksh runs printf externally; batch names to avoid one process per entry.
@@ -51,7 +60,7 @@ for entry in .[!.]* ..?* *; do
 done
 [ "$#" -eq 0 ] || printf 'U\\000%s\\000\\000\\000\\000' "$@"
 find -L . -mindepth 1 -maxdepth 1 -printf '%M\\000%f\\000%l\\000%s\\000%T@\\000' 2>/dev/null || true`;
-    const fields = (await this.exec(serial, ['shell', script], { timeout: 15000 })).split('\0');
+    const fields = (await this.fileScript(serial, script, { timeout: 15000 })).split('\0');
     const entries = new Map();
     let physicalDirectory = directory;
     for (let i = 0; i + 4 < fields.length; i += 5) {
