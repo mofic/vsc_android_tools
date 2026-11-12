@@ -16,7 +16,7 @@ test('Logcat tabs split and keep independent filters, buffers, pause and process
   try {
     const {openLogcat}=require('../src/logcat');
     const state = new Map(), globalState={get:(key,fallback)=>state.get(key) || fallback,update:async(key,value)=>state.set(key,value)};
-    const ctx={subscriptions,extensionUri:'test',globalState}, adb={binary:()=> 'adb'}, fail=e=>{throw e;};
+    const ctx={subscriptions,extensionUri:'test',globalState}, adb={binary:()=> 'adb',shell:async()=> 'PID NAME\n123 com.example.app:remote\n'}, fail=e=>{throw e;};
     const first=openLogcat(ctx,adb,'serial',fail);
     assert.match(first.webview.html,/id="newTab"/);
     await first.send({type:'ready'});await first.send({type:'newTab'});
@@ -24,6 +24,8 @@ test('Logcat tabs split and keep independent filters, buffers, pause and process
     await second.send({type:'ready'});
     const data=Buffer.from('11-12 12:13:14.123  123  456 E App: failure\n11-12 12:13:14.124  123  456 D Other: debug\n');
     processes[0].stdout.emit('data',data);processes[1].stdout.emit('data',data);
+    await new Promise(resolve=>setTimeout(resolve,450));
+    assert.equal(first.messages.findLast(m=>m.type==='lines').lines[0].processName,'com.example.app:remote');
     await first.send({type:'filter',filter:{level:'E',text:'',tag:'',package:''}});
     assert.equal(state.get('logcat.recentFilters')[0].level,'E');
     assert.ok(second.messages.some(m=>m.type==='history' && m.filters[0]?.level==='E'));

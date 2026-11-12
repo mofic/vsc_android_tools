@@ -21,6 +21,10 @@ byId('findClose').addEventListener('click', () => showSearch(false));
 for (const id of ['text', 'tag', 'package']) byId(id).addEventListener('keydown', event => {
   if (event.key === 'Enter') { event.preventDefault(); byId('apply').click(); }
 });
+byId('wrap').addEventListener('change', () => {
+  byId('logs').style.whiteSpace = byId('wrap').checked ? 'pre-wrap' : 'pre';
+  byId('logs').style.overflowWrap = byId('wrap').checked ? 'anywhere' : 'normal';
+});
 let entries = [], hits = [], currentHit = -1, selectedMark;
 function selectHit(scroll) {
   selectedMark?.classList.remove('current-match');
@@ -31,27 +35,28 @@ function selectHit(scroll) {
   if (scroll) selectedMark?.scrollIntoView({ block: 'center' });
 }
 function renderLogs(jump = false) {
-  const logs = byId('logs'), top = logs.scrollTop, anchor = hits[currentHit]?.key, oldIndex = currentHit;
+  const logs = byId('logs'), top = logs.scrollTop, left = logs.scrollLeft, anchor = hits[currentHit]?.key, oldIndex = currentHit;
   const query = byId('findText').value;
   const pattern = query ? new RegExp(query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi') : null;
   const fragment = document.createDocumentFragment(), occurrences = new Map(); hits = [];
   for (const entry of entries) {
-    const occurrence = occurrences.get(entry.line) || 0; occurrences.set(entry.line, occurrence + 1);
+    const line = entry.processName === undefined ? entry.line : `[${entry.processName || '未知进程'}] ${entry.line}`;
+    const occurrence = occurrences.get(line) || 0; occurrences.set(line, occurrence + 1);
     const row = document.createElement('div'); row.className = 'level-' + entry.level;
-    if (!pattern) row.textContent = entry.line;
+    if (!pattern) row.textContent = line;
     else {
       let offset = 0;
-      for (const match of entry.line.matchAll(pattern)) {
-        row.append(document.createTextNode(entry.line.slice(offset, match.index)));
+      for (const match of line.matchAll(pattern)) {
+        row.append(document.createTextNode(line.slice(offset, match.index)));
         const mark = document.createElement('mark'); mark.textContent = match[0]; row.append(mark);
-        hits.push({ node: mark, key: JSON.stringify([entry.line, occurrence, match.index]) });
+        hits.push({ node: mark, key: JSON.stringify([line, occurrence, match.index]) });
         offset = match.index + match[0].length;
       }
-      row.append(document.createTextNode(entry.line.slice(offset)));
+      row.append(document.createTextNode(line.slice(offset)));
     }
     fragment.append(row);
   }
-  logs.replaceChildren(fragment); logs.scrollTop = byId('scroll').checked ? logs.scrollHeight : top;
+  logs.replaceChildren(fragment); logs.scrollLeft = left; logs.scrollTop = byId('scroll').checked ? logs.scrollHeight : top;
   currentHit = anchor ? hits.findIndex(hit => hit.key === anchor) : -1;
   if (currentHit < 0 && hits.length) currentHit = Math.min(Math.max(oldIndex, 0), hits.length - 1);
   selectHit(jump);
@@ -106,6 +111,8 @@ window.addEventListener('message', ({ data }) => {
   if (data.type === 'filterApplied') {
     for (const id of ['level', 'text', 'tag', 'package']) byId(id).value = data.filter[id];
     byId('regex').checked = data.filter.regex;
+    byId('packageStatus').textContent = data.filter.package ? `包名过滤：${data.filter.package}` : (byId('package').disabled ? '离线日志 · 无设备包名映射' : '包名过滤：全部进程');
+    byId('packageStatus').title = byId('packageStatus').textContent;
     byId('filterOptionsToggle').ariaPressed = String(!!(data.filter.tag || data.filter.package));
   }
   if (data.type === 'captureState') {

@@ -52,3 +52,5 @@ footer{height:22px;line-height:22px;flex-shrink:0;padding:0 10px;border-top:1px 
 .level-E,.level-F{color:var(--vscode-terminal-ansiRed)}
 mark{background:var(--vscode-editor-findMatchHighlightBackground,#654e1c);color:inherit;border-radius:2px}
 mark.current-match{background:var(--vscode-editor-findMatchBackground,#8b6700);outline:1px solid var(--vscode-editor-findMatchBorder,var(--vscode-focusBorder))}
+
+footer{display:flex;gap:12px;align-items:center}#packageStatus{max-width:55%;overflow:hidden;text-overflow:ellipsis;flex-shrink:0}#status{overflow:hidden;text-overflow:ellipsis;min-width:0}

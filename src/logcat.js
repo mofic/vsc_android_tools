@@ -57,7 +57,7 @@ ${iconButton('apply', '应用过滤（Enter）', 'apply')}
 <label>Tag<input id="tag" placeholder="按 Tag 过滤"></label><label>包名<input id="package" ${offline} title="包名过滤需要实时设备进程信息" placeholder="留空显示全部进程"></label><small>设置后按 Enter 或点击主栏的应用按钮</small></div></details>
 <span class="separator" aria-hidden="true"></span>
 ${iconButton('pause', '暂停日志显示', 'pause', `${offline} aria-pressed="false"`)}
-<label class="scroll-toggle" title="自动滚动到最新日志"><input id="scroll" type="checkbox" checked>跟随</label>
+<label class="scroll-toggle" title="自动滚动到最新日志"><input id="scroll" type="checkbox" checked>跟随</label><label class="scroll-toggle" title="自动换行；关闭后单行显示并支持横向滚动"><input id="wrap" type="checkbox" checked>换行</label>
 ${iconButton('clear', '清空当前视图', 'clear')}
 ${iconButton('findToggle', '搜索日志（Ctrl/Cmd+F）', 'search', 'aria-expanded="false" aria-controls="searchbar"')}
 ${iconButton('screenshot', '设备截屏', 'screenshot', offline)}
@@ -66,8 +66,9 @@ ${iconButton('record', '开始录屏（无声，最长 180 秒）', 'record', `$
 <button id="newTab">新建标签页</button><button id="split">在旁边分屏</button><hr><button id="import">导入日志…</button><button id="export">导出日志…</button><button id="copy">复制日志</button><hr><button id="restart" ${offline}>重新连接</button><button id="deviceClear" ${offline}>清除设备日志…</button></div></details>
 </header>
 <section class="log-content"><div id="searchbar" hidden role="search"><input id="findText" type="search" maxlength="300" placeholder="查找日志…" aria-label="日志内搜索"><span id="findCount" role="status" aria-live="polite">0/0</span>${iconButton('findPrev', '上一个（Shift+Enter）', 'up')}${iconButton('findNext', '下一个（Enter）', 'down')}${iconButton('findClose', '关闭搜索（Escape）', 'close')}</div>
-<main id="logs" tabindex="0" aria-label="Logcat 日志"></main></section><footer><span id="status" role="status">连接中…</span></footer><script nonce="${nonce}" src="${script}"></script></body></html>`;
+<main id="logs" tabindex="0" aria-label="Logcat 日志，实时行首显示当前 PID 对应包名或进程名"></main></section><footer><span id="packageStatus" title="当前生效的包名过滤">${source ? '离线日志 · 无设备包名映射' : '包名过滤：全部进程'}</span><span id="status" role="status">连接中…</span></footer><script nonce="${nonce}" src="${script}"></script></body></html>`;
   let lines = source?.entries.slice() || [], filter = { level: 'V' }, pids, child, partial = '', paused = false, disposed = false, changed = true, packageId = '', checking = false;
+  let processNames = new Map();
   let recording, screenshotBusy = false, recordingBusy = false;
   const send = message => { if (!disposed) panel.webview.postMessage(message); };
   const captureState = () => send({ type: 'captureState', device: !!serial, recording: !!recording, screenshotBusy, recordingBusy });
@@ -114,20 +115,25 @@ ${iconButton('record', '开始录屏（无声，最长 180 秒）', 'record', `$
     process.stdout.on('data', chunk => {
       if (child !== process) return;
       partial += decoder.write(chunk); const entries = partial.split(/\r?\n/); partial = entries.pop().slice(-65536);
-      lines.push(...entries.map(parseLog)); if (lines.length > 10000) lines.splice(0, lines.length - 10000); changed = true;
+      lines.push(...entries.map(line => { const entry = parseLog(line); return { ...entry, processName: processNames.get(entry.pid) || '' }; })); if (lines.length > 10000) lines.splice(0, lines.length - 10000); changed = true;
     });
     process.stderr.on('data', chunk => send({ type: 'status', text: chunk.toString() }));
     process.on('error', e => send({ type: 'status', text: e.message }));
     process.on('close', () => { if (child === process) send({ type: 'status', text: '连接已结束，可点击重连' }); });
   }
   const render = setInterval(() => { if (!paused && changed) { send({ type: 'lines', lines: filtered() }); changed = false; } }, 400);
-  const track = setInterval(async () => {
-    if (!serial || !packageId || checking) return; checking = true;
+  async function updateProcesses() {
+    if (!serial || checking || disposed) return; checking = true;
     const current = packageId;
-    try { const result = await adb.shell(serial, ['ps', '-A', '-o', 'PID,NAME'], { timeout: 3000 }); if (current === packageId) { pids = new Set(result.split(/\r?\n/).map(line => line.trim().split(/\s+/)).filter(([, name]) => name === current || name?.startsWith(current + ':')).map(([pid]) => pid)); changed = true; } }
-    catch { if (current === packageId) { pids = new Set(); changed = true; } }
+    try {
+      const result = await adb.shell(serial, ['ps', '-A', '-o', 'PID,NAME'], { timeout: 3000 });
+      if (disposed) return;
+      processNames = new Map(result.split(/\r?\n/).map(line => line.trim().split(/\s+/)).filter(([pid, name]) => /^\d+$/.test(pid) && name));
+      if (current && current === packageId) { pids = new Set([...processNames].filter(([, name]) => name === current || name.startsWith(current + ':')).map(([pid]) => pid)); changed = true; }
+    } catch { processNames = new Map(); if (current && current === packageId) { pids = new Set(); changed = true; } }
     finally { checking = false; }
-  }, 1500);
+  }
+  const track = setInterval(updateProcesses, 1500);
   panel.webview.onDidReceiveMessage(async message => {
     if (disposed) return;
     try {
@@ -135,13 +141,13 @@ ${iconButton('record', '开始录屏（无声，最长 180 秒）', 'record', `$
         case 'ready':
           sendHistory(); captureState();
           if (source) { send({ type: 'status', text: `已导入 ${source.name} · ${source.total} 行${source.total > lines.length ? `，显示最后 ${lines.length} 行` : ''} · 离线模式` }); send({ type: 'lines', lines: filtered() }); changed = false; }
-          else start(); break;
+          else { await updateProcesses(); if (!disposed) start(); } break;
         case 'newTab': openLogcat(ctx, adb, serial, error, source); break;
         case 'split': openLogcat(ctx, adb, serial, error, source, v.ViewColumn.Beside); break;
         case 'import': await importLogcat(ctx, adb, error); break;
         case 'screenshot': await captureScreenshot(); break;
         case 'record': await toggleRecording(); break;
-        case 'restart': start(); break;
+        case 'restart': await updateProcesses(); if (!disposed) start(); break;
         case 'filter':
         case 'useFilter': {
           const saved = normalizeLogFilter(message.filter);
@@ -162,7 +168,7 @@ ${iconButton('record', '开始录屏（无声，最长 180 秒）', 'record', `$
       }
     } catch(e) { error(e); }
   });
-  const cleanup = () => { historyEvents.off('changed', sendHistory); disposed = true; recording?.stop().catch(error); child?.kill(); child = undefined; lines = []; source = undefined; pids = undefined; clearInterval(render); clearInterval(track); };
+  const cleanup = () => { historyEvents.off('changed', sendHistory); disposed = true; recording?.stop().catch(error); child?.kill(); child = undefined; lines = []; processNames.clear(); source = undefined; pids = undefined; clearInterval(render); clearInterval(track); };
   panel.onDidDispose(cleanup); ctx.subscriptions.push(panel, { dispose: cleanup });
   return panel;
 }
