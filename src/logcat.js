@@ -47,12 +47,8 @@ function openLogcat(ctx, adb, serial, error, source, column = v.ViewColumn.Activ
   const style = panel.webview.asWebviewUri(v.Uri.joinPath(ctx.extensionUri, 'media', 'logcat.css'));
   const offline = source ? 'disabled' : '';
   panel.webview.html = `<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${panel.webview.cspSource}; script-src 'nonce-${nonce}'"><link rel="stylesheet" href="${style}"></head><body><header class="toolbar" aria-label="Logcat 工具栏">
-<select id="level" aria-label="最低日志级别" title="最低日志级别"><option>V</option><option>D</option><option>I</option><option>W</option><option>E</option><option>F</option></select>
-<div class="keyword"><input id="query" list="querySuggestions" placeholder="package:mine level:ERROR  或输入关键词…" aria-label="Logcat 查询" maxlength="2000"><datalist id="querySuggestions"><option value="package:mine"><option value="level:ERROR"><option value="tag:"><option value="message:"><option value="process:"><option value="-tag:"><option value="age:5m"><option value="is:crash"><option value="is:stacktrace"><option value="name:"></datalist></div>
+<div class="keyword"><input id="query" placeholder="package:mine level:ERROR  或输入关键词…" aria-label="Logcat 查询" maxlength="2000" autocomplete="off" aria-controls="querySuggestions" aria-expanded="false" aria-haspopup="dialog"><button id="queryToggle" class="query-toggle" title="收藏和最近过滤配置" aria-label="收藏和最近过滤配置" aria-expanded="false" aria-controls="querySuggestions">▾</button><div id="querySuggestions" class="query-suggestions" role="dialog" aria-label="过滤配置" hidden></div></div>
 ${iconButton('apply', '应用过滤（Enter）', 'apply')}
-<details id="filterOptions" class="popover"><summary id="filterOptionsToggle" title="更多过滤条件" aria-label="更多过滤条件">${icon('filters')}</summary><div class="filter-options">
-<label>收藏配置<select id="favorites" aria-label="收藏的过滤配置"><option value="">选择收藏…</option></select></label><div class="favorite-actions"><button id="favorite">收藏当前配置…</button><button id="unfavorite">移除所选收藏</button></div><label>最近配置<select id="history" aria-label="最近使用的过滤配置"><option value="">选择最近配置…</option></select></label>
-<label>关键词（兼容旧配置）<input id="text" placeholder="原始日志关键词"></label><label class="scroll-toggle"><input id="regex" type="checkbox">关键词使用正则</label><label>Tag<input id="tag" placeholder="按 Tag 过滤"></label><label>包名<input id="package" ${offline} title="包名过滤需要实时设备进程信息" placeholder="留空显示全部进程"></label><small>设置后按 Enter 或点击主栏的应用按钮</small></div></details>
 <span class="separator" aria-hidden="true"></span>
 ${iconButton('pause', '暂停日志显示', 'pause', `${offline} aria-pressed="false"`)}
 <label class="scroll-toggle" title="自动滚动到最新日志"><input id="scroll" type="checkbox" checked>跟随</label><label class="scroll-toggle" title="自动换行；关闭后单行显示并支持横向滚动"><input id="wrap" type="checkbox" checked>换行</label><label class="scroll-toggle" title="隐藏时间和 PID/TID 列；窄窗口会自动精简"><input id="compact" type="checkbox">精简</label>
@@ -96,6 +92,9 @@ ${iconButton('findToggle', '搜索日志（Ctrl/Cmd+F）', 'search', 'aria-expan
       const result = await adb.shell(serial, ['ps', '-A', '-o', 'PID,NAME'], { timeout: 3000 });
       if (disposed) return;
       processNames = new Map(result.split(/\r?\n/).map(line => line.trim().split(/\s+/)).filter(([pid, name]) => /^\d+$/.test(pid) && name));
+      for (const entry of lines) if (!entry.processName && processNames.has(entry.pid)) {
+        entry.processName = processNames.get(entry.pid); changed = true;
+      }
       if (current && current === packageId) { pids = new Set([...processNames].filter(([, name]) => name === current || name.startsWith(current + ':')).map(([pid]) => pid)); changed = true; }
     } catch { processNames = new Map(); if (current && current === packageId) { pids = new Set(); changed = true; } }
     finally { checking = false; }
@@ -114,9 +113,9 @@ ${iconButton('findToggle', '搜索日志（Ctrl/Cmd+F）', 'search', 'aria-expan
               try {
                 const value = await resolveMine(false);
                 if (value && !disposed && !filterTouched) {
-                  const f = normalizeLogFilter({level:'V',text:'',tag:'',regex:false,package:value});
-                  packageId = f.package; pids = new Set(); changed = true;
-                  send({type:'filterApplied',filter:f});
+                  const f = normalizeLogFilter({level:'V',text:'',tag:'',regex:false,package:'',query:'package:mine'});
+                  queryMatcher = compileQuery(f.query,{mine:[value]}); changed = true;
+                  send({type:'filterApplied',filter:f,queryName:'当前应用：' + value + ' · package:mine'});
                 }
               } catch(e) { error(e); }
             }
@@ -140,16 +139,17 @@ ${iconButton('findToggle', '搜索日志（Ctrl/Cmd+F）', 'search', 'aria-expan
           await saveRecentFilter(ctx, saved);
           send({ type: 'status', text: packageId ? `跟踪 ${packageId}，等待匹配进程…` : (!serial && saved.package ? '过滤已应用（离线日志已跳过包名过滤）' : '过滤已应用') }); break;
         }
-        case 'favorite': {
+        case 'toggleFavorite': {
           const selected = normalizeLogFilter(message.filter);
-          const name = (await v.window.showInputBox({ prompt: '收藏配置名称', value: compileQuery(selected.query).name || '', validateInput: value => value.trim() && value.trim().length <= 60 ? undefined : '请输入 1–60 个字符' }))?.trim();
-          if (!name) break; if (name.length > 60) throw new Error('收藏名称过长');
-          const write = historyWrite.then(async () => { const items = ctx.globalState.get('logcat.favorites', []); await ctx.globalState.update('logcat.favorites', [{ name, filter: selected }, ...items.filter(item => item.name !== name)].slice(0,20)); historyEvents.emit('changed'); });
-          historyWrite = write.catch(() => {}); await write; break;
-        }
-        case 'unfavorite': {
-          const name = String(message.name || '');
-          const write = historyWrite.then(async () => { await ctx.globalState.update('logcat.favorites', ctx.globalState.get('logcat.favorites', []).filter(item => item.name !== name)); historyEvents.emit('changed'); });
+          const key = JSON.stringify(selected);
+          const write = historyWrite.then(async () => {
+            const items = ctx.globalState.get('logcat.favorites', []);
+            const matching = item => JSON.stringify(normalizeLogFilter(item.filter)) === key;
+            const exists = items.some(matching);
+            const name = (selected.query || [selected.package, selected.tag, selected.text, '级别:' + selected.level].filter(Boolean).join(' · ')).slice(0,60);
+            await ctx.globalState.update('logcat.favorites', exists ? items.filter(item => !matching(item)) : [{name,filter:selected}, ...items].slice(0,20));
+            historyEvents.emit('changed');
+          });
           historyWrite = write.catch(() => {}); await write; break;
         }
         case 'pause': paused = !paused; pausedAt = sequence; send({ type: 'paused', value: paused, pending: 0 }); changed = true; break;

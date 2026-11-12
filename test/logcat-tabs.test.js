@@ -20,7 +20,7 @@ test('Logcat tabs split and keep independent filters, buffers, pause and process
     const first=openLogcat(ctx,adb,'serial',fail,undefined,mock.ViewColumn.Active,async()=> 'com.example.app');
     assert.match(first.webview.html,/id="newTab"/);
     await first.send({type:'ready'});
-    assert.equal(first.messages.find(m=>m.type==='filterApplied').filter.package,'com.example.app');
+    assert.equal(first.messages.find(m=>m.type==='filterApplied').filter.query,'package:mine');
     assert.equal(state.has('logcat.recentFilters'),false);
     await first.send({type:'newTab'});
     const second=panels[1];assert.notEqual(first.title,second.title);assert.equal(second.column,mock.ViewColumn.Active);
@@ -35,7 +35,7 @@ test('Logcat tabs split and keep independent filters, buffers, pause and process
     assert.equal(state.get('logcat.recentFilters')[0].level,'E');
     assert.ok(second.messages.some(m=>m.type==='history' && m.filters[0]?.level==='E'));
     assert.equal(second.messages.filter(m=>m.type==='filterApplied').length,1);
-    assert.equal(second.messages.find(m=>m.type==='filterApplied').filter.package,'com.example.app');
+    assert.equal(second.messages.find(m=>m.type==='filterApplied').filter.query,'package:mine');
     await first.send({type:'copy'});assert.match(clipboard,/failure/);assert.ok(!clipboard.includes('debug'));assert.match(clipboard,/foreign app/);
     await second.send({type:'copy'});assert.match(clipboard,/debug/);
     await first.send({type:'pause'});assert.equal(first.messages.at(-1).type,'paused');assert.ok(!second.messages.some(m=>m.type==='paused'));
@@ -64,5 +64,17 @@ test('Logcat tabs split and keep independent filters, buffers, pause and process
     const noProject=openLogcat(ctx,adb,'serial',fail,undefined,mock.ViewColumn.Active,async()=>undefined);
     await noProject.send({type:'ready'});
     assert.ok(!noProject.messages.some(m=>m.type==='filterApplied'));
+    const originalInterval=global.setInterval;let tick,draw;
+    let ps='PID NAME\n';
+    let startup;
+    try {
+      global.setInterval=(fn,ms)=>{if(ms===1500)tick=fn;if(ms===400)draw=fn;return originalInterval(fn,ms);};
+      startup=openLogcat(ctx,{binary:()=> 'adb',shell:async()=>ps},'serial',fail,undefined,mock.ViewColumn.Active,async()=> 'com.example.app');
+    } finally {global.setInterval=originalInterval;}
+    await startup.send({type:'ready'});
+    processes.at(-1).stdout.emit('data',Buffer.from('11-12 12:13:14.123  555  456 E App: startup log\n'));
+    draw();assert.equal(startup.messages.findLast(m=>m.type==='lines').lines.length,0);
+    ps='PID NAME\n555 com.example.app\n';await tick();draw();
+    assert.equal(startup.messages.findLast(m=>m.type==='lines').lines[0].processName,'com.example.app');
   } finally {for(const item of subscriptions)item.dispose();Module._load=original;}
 });

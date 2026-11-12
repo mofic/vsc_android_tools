@@ -1,19 +1,64 @@
 'use strict';
 const vscode = acquireVsCodeApi();
 const byId = id => document.getElementById(id);
-const currentFilter = () => ({ query: byId('query').value, level: byId('level').value, text: byId('text').value, regex: byId('regex').checked, tag: byId('tag').value, package: byId('package').value });
-for (const id of ['newTab','split','apply','pause','clear','deviceClear','copy','import','export','restart','favorite','unfavorite']) byId(id).addEventListener('click', () => {
-  if (id === 'apply' || id === 'favorite') vscode.postMessage({ type: id === 'apply' ? 'filter' : 'favorite', filter: currentFilter() });
-  else if (id === 'unfavorite') { if (byId('favorites').value) vscode.postMessage({ type: id, name: JSON.parse(byId('favorites').value).name }); }
+const currentFilter = () => ({query:byId('query').value,level:'V',text:'',regex:false,tag:'',package:''});
+for (const id of ['newTab','split','apply','pause','clear','deviceClear','copy','import','export','restart']) byId(id).addEventListener('click', () => {
+  if (id === 'apply') vscode.postMessage({ type:'filter', filter:currentFilter() });
   else vscode.postMessage({ type: id });
   byId('more').open = false;
-  if (id === 'apply') byId('filterOptions').open = false;
+  if (id === 'apply') showSuggestions(false);
 });
-byId('history').addEventListener('change', () => {
-  if (byId('history').value) vscode.postMessage({ type: 'useFilter', filter: JSON.parse(byId('history').value) });
+let recentFilters = [], favoriteFilters = [];
+const filterKey = f => f.query || '';
+const filterLabel = f => f.query || '全部日志';
+const queryOnly = f => f && !f.text && !f.regex && !f.tag && !f.package && (!f.level || f.level === 'V');
+function renderSuggestions() {
+  const popup = byId('querySuggestions'), focusKey = document.activeElement?.dataset?.filterKey;
+  popup.replaceChildren();
+  const current = currentFilter(), seen = new Set(); let focusStar;
+  const add = (filter, label) => {
+    const key = filterKey(filter); if (seen.has(key)) return; seen.add(key);
+    const favorite = favoriteFilters.some(item => filterKey(item.filter) === key);
+    const row = document.createElement('div'); row.className = 'query-option';
+    const choose = document.createElement('button'); choose.className = 'query-choice';
+    choose.textContent = label || filterLabel(filter); choose.title = filterLabel(filter);
+    choose.addEventListener('click', () => { vscode.postMessage({type:'useFilter',filter}); showSuggestions(false); });
+    const star = document.createElement('button'); star.className = 'query-star';
+    star.dataset.filterKey = key; if (focusKey === key) focusStar = star;
+    star.textContent = favorite ? '★' : '☆'; star.ariaPressed = String(favorite);
+    star.title = star.ariaLabel = favorite ? '取消收藏' : '收藏配置';
+    star.addEventListener('click', () => vscode.postMessage({type:'toggleFavorite',filter}));
+    row.append(choose,star); popup.append(row);
+  };
+  for (const item of favoriteFilters) add(item.filter,item.name);
+  add(current);
+  for (const filter of recentFilters) add(filter);
+  for (const query of ['package:mine','level:ERROR','tag:','message:','process:','-tag:','age:5m','is:crash','is:stacktrace']) {
+    const row = document.createElement('button'); row.className = 'query-hint'; row.textContent = query;
+    if (seen.has(filterKey({...current,query}))) continue;
+    row.addEventListener('click', () => { byId('query').value = query; byId('query').focus(); showSuggestions(false); });
+    popup.append(row);
+  }
+  focusStar?.focus();
+}
+function showSuggestions(visible) {
+  byId('querySuggestions').hidden = !visible;
+  byId('query').ariaExpanded = byId('queryToggle').ariaExpanded = String(visible);
+  if (visible) renderSuggestions();
+}
+byId('queryToggle').addEventListener('click', () => showSuggestions(byId('querySuggestions').hidden));
+byId('query').addEventListener('focus', () => showSuggestions(true));
+byId('query').addEventListener('input', () => showSuggestions(true));
+byId('query').addEventListener('keydown', event => {
+  if (event.key === 'ArrowDown') { event.preventDefault(); showSuggestions(true); byId('querySuggestions').querySelector('button')?.focus(); }
 });
-byId('favorites').addEventListener('change', () => {
-  if (byId('favorites').value) vscode.postMessage({ type: 'useFilter', filter: JSON.parse(byId('favorites').value).filter });
+byId('querySuggestions').addEventListener('keydown', event => {
+  if (event.key === 'Escape') { event.preventDefault(); showSuggestions(false); byId('queryToggle').focus(); }
+  if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+    event.preventDefault();
+    const buttons = [...byId('querySuggestions').querySelectorAll('button')], index = buttons.indexOf(document.activeElement);
+    buttons[(index + (event.key === 'ArrowDown' ? 1 : -1) + buttons.length) % buttons.length]?.focus();
+  }
 });
 function showSearch(visible) {
   byId('searchbar').hidden = !visible;
@@ -23,7 +68,7 @@ function showSearch(visible) {
 }
 byId('findToggle').addEventListener('click', () => showSearch(byId('searchbar').hidden));
 byId('findClose').addEventListener('click', () => showSearch(false));
-for (const id of ['query', 'text', 'tag', 'package']) byId(id).addEventListener('keydown', event => {
+for (const id of ['query']) byId(id).addEventListener('keydown', event => {
   if (event.key === 'Enter') { event.preventDefault(); byId('apply').click(); }
 });
 byId('wrap').addEventListener('change', () => {
@@ -120,47 +165,37 @@ byId('findText').addEventListener('keydown', event => {
 });
 window.addEventListener('keydown', event => {
   if (event.key === 'Escape') {
-    for (const id of ['more', 'filterOptions']) if (byId(id).open) { byId(id).open = false; byId(id).querySelector('summary').focus(); }
+    showSuggestions(false);
+    for (const id of ['more']) if (byId(id).open) { byId(id).open = false; byId(id).querySelector('summary').focus(); }
     if (!byId('searchbar').hidden) showSearch(false);
   }
   if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'f') { event.preventDefault(); showSearch(true); }
 });
-for (const id of ['more', 'filterOptions']) byId(id).addEventListener('toggle', () => {
+for (const id of ['more']) byId(id).addEventListener('toggle', () => {
   const details = byId(id); if (!details.open) return;
-  byId(id === 'more' ? 'filterOptions' : 'more').open = false;
   const panel = details.querySelector('div'), anchor = details.querySelector('summary').getBoundingClientRect();
   panel.style.left = Math.max(8, Math.min(anchor.right - panel.offsetWidth, window.innerWidth - panel.offsetWidth - 8)) + 'px';
   panel.style.top = document.querySelector('header').getBoundingClientRect().bottom + 4 + 'px';
 });
 window.addEventListener('resize', () => {
-  for (const id of ['more', 'filterOptions']) { byId(id).open = false; byId(id).querySelector('div').style.left = ''; }
+  showSuggestions(false);
+  for (const id of ['more']) { byId(id).open = false; byId(id).querySelector('div').style.left = ''; }
 });
 window.addEventListener('click', event => {
+  if (!event.target.closest('.keyword')) showSuggestions(false);
   if (!event.target.closest('#more')) byId('more').open = false;
-  if (!event.target.closest('#filterOptions')) byId('filterOptions').open = false;
 });
 window.addEventListener('message', ({ data }) => {
   if (data.type === 'history') {
-    const history = byId('history'), selected = history.value;
-    history.replaceChildren(new Option('选择最近配置…', ''));
-    for (const f of data.filters) {
-      const label = [f.query, `级别:${f.level}`, f.text && `关键词:${f.text}`, f.regex && '正则', f.tag && `Tag:${f.tag}`, f.package && `包名:${f.package}`].filter(Boolean).join(' · ');
-      const option = new Option(label, JSON.stringify(f)); option.title = label; history.add(option);
-    }
-    history.value = selected;
-    const favorites = byId('favorites'), previous = favorites.value; favorites.replaceChildren(new Option('选择收藏…', ''));
-    for (const item of data.favorites || []) favorites.add(new Option(item.name, JSON.stringify(item)));
-    favorites.value = previous;
+    recentFilters = (data.filters || []).filter(queryOnly); favoriteFilters = (data.favorites || []).filter(item => queryOnly(item.filter));
+    renderSuggestions();
   }
   if (data.type === 'filterApplied') {
-    for (const id of ['level', 'text', 'tag', 'package']) byId(id).value = data.filter[id];
     byId('query').value = data.filter.query || '';
-    byId('regex').checked = data.filter.regex;
     const f = data.filter;
-    byId('packageStatus').textContent = [data.queryName || f.query, f.package && `包名过滤：${f.package}`, f.tag && `Tag:${f.tag}`, f.text && `关键词:${f.text}`, f.level !== 'V' && `级别:${f.level}`].filter(Boolean).join(' · ') || (byId('package').disabled ? '离线日志 · 无设备包名映射' : '包名过滤：全部进程');
+    byId('packageStatus').textContent = data.queryName || f.query || '全部日志';
     byId('query').ariaInvalid = 'false'; byId('query').title = '示例：package:mine level:ERROR -tag:Noise';
     byId('packageStatus').title = byId('packageStatus').textContent;
-    byId('filterOptionsToggle').ariaPressed = String(!!(data.filter.tag || data.filter.package));
   }
   if (data.type === 'queryError') { byId('query').ariaInvalid = 'true'; byId('query').title = data.text; byId('status').textContent = data.text; }
   if (data.type === 'status') byId('status').textContent = data.text;

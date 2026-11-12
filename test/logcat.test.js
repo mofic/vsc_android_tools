@@ -22,7 +22,7 @@ test('offline import renders, filters, exports without ADB; cancel and size erro
     const state=new Map(), globalState={get:(key,fallback)=>state.get(key) || fallback,update:async(key,value)=>state.set(key,value)};
     const panel=await importLogcat({subscriptions,extensionUri:'test',globalState},adb,e=>errors.push(e));
     assert.match(panel.webview.html,/id="searchbar" hidden/);assert.match(panel.webview.html,/<details id="more"/);
-    assert.match(panel.webview.html,/id="import"/); assert.match(panel.webview.html,/id="package" disabled/);
+    assert.match(panel.webview.html,/id="import"/); assert.doesNotMatch(panel.webview.html,/id="(?:package|filterOptions|level|text|regex|favorites|history)"/);
     await onMessage({type:'ready'});
     assert.equal(messages.find(m=>m.type==='lines').lines.length,2);
     assert.equal(messages.find(m=>m.type==='lines').lines[0].level,'E');
@@ -37,9 +37,10 @@ test('offline import renders, filters, exports without ADB; cancel and size erro
     assert.ok(errors.pop() instanceof SyntaxError);
     assert.equal(JSON.stringify(state.get('logcat.recentFilters')),before);
     const favorite={level:'E',text:'',tag:'',package:'',query:'message:failure level:ERROR'};
-    await onMessage({type:'favorite',filter:favorite});assert.equal(state.get('logcat.favorites')[0].name,'Errors');
+    await onMessage({type:'toggleFavorite',filter:favorite});assert.equal(state.get('logcat.favorites')[0].name,favorite.query);
+    state.set('logcat.favorites',[{name:'Errors',filter:favorite}]);
     await onMessage({type:'useFilter',filter:state.get('logcat.favorites')[0].filter});await onMessage({type:'copy'});assert.match(clipboard,/failure/);
-    await onMessage({type:'unfavorite',name:'Errors'});assert.equal(state.get('logcat.favorites').length,0);
+    await onMessage({type:'toggleFavorite',filter:favorite});assert.equal(state.get('logcat.favorites').length,0);
     cancelled=true; await onMessage({type:'import'}); assert.equal(panels.length,1);
     cancelled=false;size=33*1024*1024;
     await assert.rejects(importLogcat({subscriptions},adb,e=>errors.push(e)),/超过 32MB/);
