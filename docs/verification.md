@@ -146,3 +146,12 @@
 - 过滤框旁增加问号语法帮助，说明当前应用/包名、Tag、消息、级别、进程、排除、正则、时间范围、崩溃与堆栈，以及空格、同字段或、显式与/或和括号的组合规则。
 - 下拉语法建议增加中文用途说明；点击补到现有条件末尾，或补全相同字段的未完成冒号条件，不再覆盖整条查询，也不自动应用。
 - npm test 29 项、npm run check 通过；新增建议保留已有条件、补全未完成字段及不自动提交的断言。本次未做实际 VS Code 窗口视觉验证。
+
+
+## 2026-11-17 ADB 自动检测（0.2.13）
+
+- npm test：36 项通过，新增 7 项路径发现行为测试；macOS 本机模拟 Linux/Windows 路径规则。
+- npm run check：通过，新增 src/adb-path.js 已纳入覆盖。
+- 本机传入空环境查找 ADB，再执行 adb version：成功。没有访问设备或屏幕内容。
+- npm run package 的 npx 在线解析等待，离线尝试 ENOTCACHED；改用本机已有 @vscode/vsce 缓存直接打包成功，生成 android-device-tools-0.2.13.vsix。缺 repository 字段产生警告。
+- 未在真实 Extension Host、Windows/Linux 主机或真机上验证；未自动安装新包。

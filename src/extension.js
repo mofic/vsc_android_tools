@@ -4,12 +4,13 @@ const fs = require('node:fs/promises');
 const os = require('node:os');
 const path = require('node:path');
 const c = require('./core');
+const { resolveAdb } = require('./adb-path');
 const { deviceCapture } = require('./device-capture');
 const runTargets = require('./run-targets');
 const { registerAppView } = require('./app-view');
 const { openLogcat, importLogcat } = require('./logcat');
 function activate(ctx) {
-  const adb = new c.Adb(() => v.workspace.getConfiguration('androidTools').get('adbPath', 'adb'));
+  const adb = new c.Adb(() => resolveAdb(v.workspace.getConfiguration('androidTools').get('adbPath', 'adb')));
   const output = v.window.createOutputChannel('Android Tools');
   let selected, deviceList = [], root = '/sdcard', project = ctx.workspaceState.get('project');
   const edited = new Map(), opening = new Map();

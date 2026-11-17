@@ -57,3 +57,20 @@ npm run check
 真机测试使用唯一命名的测试目录并清理，不能拿用户已有文件或应用做破坏性测试。截屏、录屏和现有数据读取遵循会话中已有授权，不把授权扩大到无关内容。不要在日志、提交或报告中暴露私有屏幕内容。
 
 提交前检查 `git diff` 和 `git status`，不覆盖用户修改，不重写历史；远程推送或发布遵循用户授权。最终说明实际改动、已运行的验证和未验证范围，不能把模拟测试描述成真机测试。
+
+
+<!-- shared-ai-workflow -->
+## 公共 AI 工作流
+
+本机公共库：[/Users/lanweining/Desktop/ai-workflow/AGENTS.md](/Users/lanweining/Desktop/ai-workflow/AGENTS.md)。
+开发任务开始时读取公共协议、docs/workflow.md 与适用经验；项目规则及用户指令优先。
+项目 spec/task/ADR 保留本地；通用经验脱敏验证后按公共同步流程回填。
+公共库不可用时保留现有流程并报告。跨机器使用前重新接入本机公共库。
+
+
+<!-- shared-ai-workflow:project-bootstrap -->
+## 项目初始化与文档维护
+
+首次或补齐接入时读取 [/Users/lanweining/Desktop/ai-workflow/docs/project-bootstrap.md](/Users/lanweining/Desktop/ai-workflow/docs/project-bootstrap.md)，扫描实际代码与配置填充项目文档。
+脚本仅创建骨架；处理待扫描标记、复用已有文档、回填初始化task后才算完成。
+后续按 docs/development/ai-workflow.md 更新架构、开发、经验和需求资产；项目同职责已有文档优先复用。

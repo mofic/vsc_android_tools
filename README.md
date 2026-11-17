@@ -5,8 +5,8 @@ VS Code 安卓设备管理插件，支持原生 Android Gradle 项目和多根�
 ## 安装与运行
 
 1. 安装 Android SDK Platform Tools，在终端确认 `adb devices -l` 能看到已授权设备。
-2. 在 VS Code 执行 **Extensions: Install from VSIX…**，选择本仓库生成的 `android-device-tools-0.2.12.vsix`。
-3. 打开左侧 Android Tools 图标，点击设备选中目标。ADB 不在 PATH 时设置 `androidTools.adbPath`。
+2. 在 VS Code 执行 **Extensions: Install from VSIX…**，选择本仓库生成的 `android-device-tools-0.2.13.vsix`。
+3. 打开左侧 Android Tools 图标，点击设备选中目标。插件自动从 PATH、`ANDROID_HOME`、`ANDROID_SDK_ROOT` 和系统常见 Android SDK 目录查找 ADB；也可通过 `androidTools.adbPath` 指定完整路径（优先于自动检测）。
 4. 使用命令面板搜索 `Android Tools` 执行应用和文件操作；文件树提供右键菜单。
 
 开发：本目录执行 `npm test` 和 `npm run check`；VS Code 打开目录后按 F5 启动 Extension Development Host。`npm run package` 生成 VSIX（首次需要网络下载打包工具）。
@@ -108,3 +108,5 @@ Logcat 顶部“更多操作”中点击“导入日志”，或从命令面板�
 git remote add origin <仓库地址>
 git push -u origin main
 ```
+
+开发流程与任务记录见仓库内 `docs/development/ai-workflow.md`、`docs/architecture/module-map.md`、`docs/development/commands.md` 和 `tasks/adb-discovery.md`。
